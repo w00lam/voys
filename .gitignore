@@ -1,0 +1,51 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Environment
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+application-local.properties
+
+# Logs
+*.log
+logs/
+
+# Java / Spring build outputs
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+
+# Gradle
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Maven
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Dependencies / frontend build outputs
+node_modules/
+dist/
+coverage/
+
+# Runtime / temp files
+tmp/
+temp/
+*.pid
+*.seed
+*.stackdump
+hs_err_pid*
+replay_pid*
