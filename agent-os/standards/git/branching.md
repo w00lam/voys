@@ -26,14 +26,23 @@ Use descriptive branch prefixes:
 - `refactor/*` for behavior-preserving code restructuring.
 - `test/*` for test-only improvements.
 
+Prefer issue-first branch names:
+
+```text
+feature/{issue-number}-{short-description}
+fix/{issue-number}-{short-description}
+chore/{issue-number}-{short-description}
+```
+
 Examples:
 
 ```text
 chore/project-bootstrap
+feature/12-session-auth
+fix/18-upload-content-type-validation
 feature/session-auth
 feature/browser-recording
 feature/whisper-transcription
-fix/upload-content-type-validation
 docs/architecture-decisions
 ```
 
@@ -68,9 +77,17 @@ Use the repository PR template for all pull requests. CI should run automaticall
 
 CODEOWNERS should request `@w00lam` for review by default. Review and merge decisions remain manual.
 
+Preferred workflow:
+
+1. Create or choose a GitHub issue before implementation.
+2. Create a branch that includes the issue number.
+3. Push the branch.
+4. Let GitHub Actions open or update a draft PR against `main`.
+5. Let the PR close the issue when merged.
+
 Working branch pushes should automatically open or update a draft PR against `main` through GitHub Actions. The bot should also add an automated review checklist comment inside the PR.
 
-The same workflow should create or reuse a tracking issue for the branch and link it from the PR with `Closes #issue`. This keeps planning, review, and merge history connected.
+If the branch name includes an issue number, the workflow should link that issue from the PR with `Closes #issue`. If no issue number is present, the workflow may create a fallback tracking issue and link that instead.
 
 Automatic PR creation applies to:
 
@@ -88,9 +105,11 @@ Automated PR, issue, and review comments should use the repository secret `VOYS_
 Automated review comments should use branch-specific titles like:
 
 ```text
-Review: chore/project-bootstrap
-Review: feature/session-auth
+리뷰: chore/project-bootstrap
+리뷰: feature/12-session-auth
 ```
+
+Automated PR, issue, and review text should be written in Korean by default.
 
 ## Main Branch Rules
 

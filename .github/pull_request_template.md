@@ -1,27 +1,26 @@
-## Summary
+## 요약
 
 - 
 
-## Why
+## 배경
 
 - 
 
-## Changes
+## 변경 사항
 
 - 
 
-## Validation
+## 검증
 
-- [ ] Backend tests pass
-- [ ] Frontend build passes
-- [ ] Manual verification completed where relevant
+- [ ] 백엔드 테스트 통과
+- [ ] 프론트엔드 빌드 통과
+- [ ] 필요한 수동 검증 완료
 
 ## Agent OS
 
 - Spec:
 - Standards:
 
-## Notes
+## 메모
 
 - 
-

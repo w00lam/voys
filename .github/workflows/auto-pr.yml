@@ -36,8 +36,11 @@ jobs:
             const base = 'main';
             const issueLabel = 'auto-pr';
             const branchLabel = `branch:${head}`;
+            const issueMatch = head.match(/^(feature|fix|chore|docs|refactor|test)\/(\d+)[-_\/].+/);
+            const linkedIssueNumber = issueMatch ? Number(issueMatch[2]) : null;
             const readableTitle = head
               .replace(/^(feature|fix|chore|docs|refactor|test)\//, '')
+              .replace(/^\d+[-_\/]/, '')
               .replace(/[-_]+/g, ' ')
               .replace(/\b\w/g, (char) => char.toUpperCase());
 
@@ -61,36 +64,58 @@ jobs:
             await ensureLabel(issueLabel, '6f42c1', 'Created or managed by the automatic PR workflow');
             await ensureLabel(branchLabel, 'bfd4f2', `Tracks work for ${head}`);
 
-            const issues = await github.rest.issues.listForRepo({
-              owner,
-              repo,
-              state: 'open',
-              labels: branchLabel,
-              per_page: 10,
-            });
+            let issue;
+            if (linkedIssueNumber) {
+              const existingIssue = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: linkedIssueNumber,
+              });
+              issue = existingIssue.data;
 
-            let issue = issues.data.find((item) => !item.pull_request);
-            if (!issue) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: linkedIssueNumber,
+                labels: [issueLabel, branchLabel],
+              });
+            } else {
+              const issues = await github.rest.issues.listForRepo({
+                owner,
+                repo,
+                state: 'open',
+                labels: branchLabel,
+                per_page: 10,
+              });
+
+              issue = issues.data.find((item) => !item.pull_request);
+            }
+
+            if (!issue || issue.pull_request) {
               const createdIssue = await github.rest.issues.create({
                 owner,
                 repo,
                 title: readableTitle,
                 labels: [issueLabel, branchLabel],
                 body: [
-                  '## Goal',
+                  '## 목표',
                   '',
-                  `Track work for branch \`${head}\`.`,
+                  `\`${head}\` 브랜치 작업을 추적합니다.`,
                   '',
-                  '## Checklist',
+                  linkedIssueNumber
+                    ? `요청된 이슈 #${linkedIssueNumber}를 추적 이슈로 사용할 수 없어 fallback 이슈를 생성했습니다.`
+                    : '브랜치명에 이슈 번호가 없어 자동으로 생성된 추적 이슈입니다.',
                   '',
-                  '- [ ] Agent OS spec is linked or created when needed.',
-                  '- [ ] Implementation follows project standards.',
-                  '- [ ] Tests or manual validation are completed.',
-                  '- [ ] PR is reviewed before merge.',
+                  '## 체크리스트',
                   '',
-                  '## Links',
+                  '- [ ] 필요한 경우 Agent OS spec이 연결되었거나 생성되었습니다.',
+                  '- [ ] 구현이 프로젝트 standards를 따릅니다.',
+                  '- [ ] 테스트 또는 수동 검증이 완료되었습니다.',
+                  '- [ ] merge 전에 PR 리뷰가 완료되었습니다.',
                   '',
-                  '- PR: created automatically after branch push.',
+                  '## 링크',
+                  '',
+                  '- PR: 브랜치 push 이후 자동 생성됩니다.',
                 ].join('\n'),
               });
               issue = createdIssue.data;
@@ -106,34 +131,34 @@ jobs:
 
             const title = `${readableTitle}`;
             const body = [
-              '## Summary',
+              '## 요약',
               '',
-              `- Automated PR for branch \`${head}\`.`,
+              `- \`${head}\` 브랜치에 대해 자동 생성된 PR입니다.`,
               `- Closes #${issue.number}`,
               '',
-              '## Why',
+              '## 배경',
               '',
-              '- Keep work on short-lived branches and merge manually after review.',
+              '- 짧은 작업 브랜치에서 변경을 진행하고, 리뷰 후 수동으로 merge하기 위한 PR입니다.',
               '',
-              '## Changes',
+              '## 변경 사항',
               '',
-              '- See commit diff for details.',
+              '- 자세한 내용은 commit diff를 확인합니다.',
               '',
-              '## Validation',
+              '## 검증',
               '',
-              '- [ ] Backend tests pass',
-              '- [ ] Frontend build passes',
-              '- [ ] Manual verification completed where relevant',
+              '- [ ] 백엔드 테스트 통과',
+              '- [ ] 프론트엔드 빌드 통과',
+              '- [ ] 필요한 수동 검증 완료',
               '',
               '## Agent OS',
               '',
               '- Spec:',
               '- Standards:',
               '',
-              '## Notes',
+              '## 메모',
               '',
-              '- This PR was opened automatically by GitHub Actions.',
-              '- Merge remains manual.',
+              '- 이 PR은 GitHub Actions가 자동으로 열었습니다.',
+              '- merge는 수동으로 진행합니다.',
             ].join('\n');
 
             let pr;
@@ -165,18 +190,22 @@ jobs:
               repo,
               issue_number: issue.number,
               body: [
-                '## Goal',
+                '## 목표',
                 '',
-                `Track work for branch \`${head}\`.`,
+                `\`${head}\` 브랜치 작업을 추적합니다.`,
                 '',
-                '## Checklist',
+                linkedIssueNumber
+                  ? `이 브랜치는 이슈 #${linkedIssueNumber}와 연결되어 있습니다.`
+                  : '브랜치명에 이슈 번호가 없어 자동으로 생성된 추적 이슈입니다.',
                 '',
-                '- [ ] Agent OS spec is linked or created when needed.',
-                '- [ ] Implementation follows project standards.',
-                '- [ ] Tests or manual validation are completed.',
-                '- [ ] PR is reviewed before merge.',
+                '## 체크리스트',
                 '',
-                '## Links',
+                '- [ ] 필요한 경우 Agent OS spec이 연결되었거나 생성되었습니다.',
+                '- [ ] 구현이 프로젝트 standards를 따릅니다.',
+                '- [ ] 테스트 또는 수동 검증이 완료되었습니다.',
+                '- [ ] merge 전에 PR 리뷰가 완료되었습니다.',
+                '',
+                '## 링크',
                 '',
                 `- PR: #${pr.number}`,
               ].join('\n'),
@@ -213,22 +242,22 @@ jobs:
               .join('\n');
 
             const body = [
-              `## Review: ${head}`,
+              `## 리뷰: ${head}`,
               '',
-              `Coordinator verification for PR #${pull_number} and issue #${issue_number}:`,
+              `PR #${pull_number} / 이슈 #${issue_number} 자동 검증 결과입니다.`,
               '',
-              '- [ ] PR has a focused branch and commit scope.',
-              '- [ ] Agent OS spec is referenced when implementation work is included.',
-              '- [ ] Backend changes follow `backend/spring` and `api/rest` standards.',
-              '- [ ] Frontend changes follow `frontend/react` standards.',
-              '- [ ] Tests or manual validation are documented.',
-              '- [ ] No secrets, local storage files, build outputs, or audio files are included.',
+              '- [ ] PR 브랜치와 커밋 범위가 명확합니다.',
+              '- [ ] 구현 작업이 포함된 경우 Agent OS spec이 참조되었습니다.',
+              '- [ ] 백엔드 변경은 `backend/spring`, `api/rest` standards를 따릅니다.',
+              '- [ ] 프론트엔드 변경은 `frontend/react` standards를 따릅니다.',
+              '- [ ] 테스트 또는 수동 검증 내용이 문서화되었습니다.',
+              '- [ ] secret, 로컬 저장 파일, 빌드 산출물, 오디오 파일이 포함되지 않았습니다.',
               '',
-              '### Changed Files',
+              '### 변경 파일',
               '',
               fileList || '- No files detected.',
               '',
-              '> This is an automated checklist review. Final review and merge remain manual.',
+              '> 이 코멘트는 자동 체크리스트 리뷰입니다. 최종 리뷰와 merge는 수동으로 진행합니다.',
             ].join('\n');
 
             await github.rest.issues.createComment({
