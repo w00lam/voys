@@ -169,7 +169,6 @@ jobs:
                 repo,
                 pull_number: pr.number,
                 body,
-                maintainer_can_modify: true,
               });
             } else {
               const created = await github.rest.pulls.create({
