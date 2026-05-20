@@ -111,6 +111,15 @@ Automated review comments should use branch-specific titles like:
 
 Automated PR, issue, and review text should be written in Korean by default.
 
+Automated PR and issue titles should use a Korean type prefix:
+
+```text
+기능: Session Auth
+수정: Upload Content Type Validation
+작업: Project Bootstrap
+문서: Architecture Decisions
+```
+
 ## Main Branch Rules
 
 - `main` should remain runnable.

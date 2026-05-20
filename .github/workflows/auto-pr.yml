@@ -43,6 +43,17 @@ jobs:
               .replace(/^\d+[-_\/]/, '')
               .replace(/[-_]+/g, ' ')
               .replace(/\b\w/g, (char) => char.toUpperCase());
+            const branchType = head.split('/')[0];
+            const typeLabels = {
+              feature: '기능',
+              fix: '수정',
+              chore: '작업',
+              docs: '문서',
+              refactor: '리팩터링',
+              test: '테스트',
+            };
+            const koreanType = typeLabels[branchType] || '작업';
+            const generatedTitle = `${koreanType}: ${readableTitle}`;
 
             async function ensureLabel(name, color, description) {
               try {
@@ -95,7 +106,7 @@ jobs:
               const createdIssue = await github.rest.issues.create({
                 owner,
                 repo,
-                title: readableTitle,
+                title: generatedTitle,
                 labels: [issueLabel, branchLabel],
                 body: [
                   '## 목표',
@@ -129,7 +140,7 @@ jobs:
               state: 'open',
             });
 
-            const title = `${readableTitle}`;
+            const title = generatedTitle;
             const body = [
               '## 요약',
               '',
