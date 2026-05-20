@@ -28,6 +28,7 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const pull_number = context.payload.pull_request.number;
+            const head = context.payload.pull_request.head.ref;
 
             const files = await github.paginate(github.rest.pulls.listFiles, {
               owner,
@@ -59,7 +60,7 @@ jobs:
             }
 
             const body = [
-              '## Bot Review',
+              `## Review: ${head}`,
               '',
               findings.length > 0 ? '### Findings' : '### Findings',
               '',
@@ -88,4 +89,3 @@ jobs:
               issue_number: pull_number,
               body,
             });
-

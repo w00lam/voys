@@ -70,6 +70,8 @@ CODEOWNERS should request `@w00lam` for review by default. Review and merge deci
 
 Working branch pushes should automatically open or update a draft PR against `main` through GitHub Actions. The bot should also add an automated review checklist comment inside the PR.
 
+The same workflow should create or reuse a tracking issue for the branch and link it from the PR with `Closes #issue`. This keeps planning, review, and merge history connected.
+
 Automatic PR creation applies to:
 
 - `feature/**`
@@ -80,6 +82,13 @@ Automatic PR creation applies to:
 - `test/**`
 
 The bot review is a guardrail, not approval. It can point out missing specs, risky files, workflow changes, and validation gaps, but the final review and merge decision belongs to `@w00lam`.
+
+Automated review comments should use branch-specific titles like:
+
+```text
+Review: chore/project-bootstrap
+Review: feature/session-auth
+```
 
 ## Main Branch Rules
 
