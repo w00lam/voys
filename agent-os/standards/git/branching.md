@@ -68,6 +68,19 @@ Use the repository PR template for all pull requests. CI should run automaticall
 
 CODEOWNERS should request `@w00lam` for review by default. Review and merge decisions remain manual.
 
+Working branch pushes should automatically open or update a draft PR against `main` through GitHub Actions. The bot should also add an automated review checklist comment inside the PR.
+
+Automatic PR creation applies to:
+
+- `feature/**`
+- `fix/**`
+- `chore/**`
+- `docs/**`
+- `refactor/**`
+- `test/**`
+
+The bot review is a guardrail, not approval. It can point out missing specs, risky files, workflow changes, and validation gaps, but the final review and merge decision belongs to `@w00lam`.
+
 ## Main Branch Rules
 
 - `main` should remain runnable.

@@ -1,0 +1,91 @@
+name: Bot Review
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    name: Review checklist
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Add review comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = context.payload.pull_request.number;
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+
+            const hasAgentSpec = files.some((file) => file.filename.startsWith('agent-os/specs/'));
+            const hasBackend = files.some((file) => file.filename.startsWith('backend/'));
+            const hasFrontend = files.some((file) => file.filename.startsWith('frontend/'));
+            const hasWorkflow = files.some((file) => file.filename.startsWith('.github/workflows/'));
+            const riskyFiles = files.filter((file) =>
+              file.filename.includes('.env') && file.filename !== '.env.example'
+            );
+
+            const findings = [];
+
+            if ((hasBackend || hasFrontend) && !hasAgentSpec) {
+              findings.push('- Implementation files changed, but no Agent OS spec file changed. Confirm an existing spec covers this work.');
+            }
+
+            if (riskyFiles.length > 0) {
+              findings.push(`- Potential secret-bearing env file changed: ${riskyFiles.map((file) => `\`${file.filename}\``).join(', ')}`);
+            }
+
+            if (hasWorkflow) {
+              findings.push('- GitHub workflow files changed. Review permissions and trigger behavior carefully.');
+            }
+
+            const body = [
+              '## Bot Review',
+              '',
+              findings.length > 0 ? '### Findings' : '### Findings',
+              '',
+              findings.length > 0 ? findings.join('\n') : '- No blocking automated findings from the checklist.',
+              '',
+              '### Checklist',
+              '',
+              '- [ ] Scope is focused and matches the branch name.',
+              '- [ ] Agent OS standards are followed.',
+              '- [ ] Tests or manual validation are described in the PR.',
+              '- [ ] Merge remains a human decision.',
+              '',
+              '### Context',
+              '',
+              `- Backend files changed: ${hasBackend ? 'yes' : 'no'}`,
+              `- Frontend files changed: ${hasFrontend ? 'yes' : 'no'}`,
+              `- Agent OS spec changed: ${hasAgentSpec ? 'yes' : 'no'}`,
+              `- Workflow files changed: ${hasWorkflow ? 'yes' : 'no'}`,
+              '',
+              '> This automated review is a guardrail, not approval.',
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pull_number,
+              body,
+            });
+

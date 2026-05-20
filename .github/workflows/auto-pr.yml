@@ -1,0 +1,150 @@
+name: Auto PR
+
+on:
+  push:
+    branches:
+      - "feature/**"
+      - "fix/**"
+      - "chore/**"
+      - "docs/**"
+      - "refactor/**"
+      - "test/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  open-pr:
+    name: Open or update PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Open or update pull request
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = context.ref.replace('refs/heads/', '');
+            const base = 'main';
+
+            const existing = await github.rest.pulls.list({
+              owner,
+              repo,
+              head: `${owner}:${head}`,
+              base,
+              state: 'open',
+            });
+
+            const title = `Bootstrap/update ${head}`;
+            const body = [
+              '## Summary',
+              '',
+              `- Automated PR for branch \`${head}\`.`,
+              '',
+              '## Why',
+              '',
+              '- Keep work on short-lived branches and merge manually after review.',
+              '',
+              '## Changes',
+              '',
+              '- See commit diff for details.',
+              '',
+              '## Validation',
+              '',
+              '- [ ] Backend tests pass',
+              '- [ ] Frontend build passes',
+              '- [ ] Manual verification completed where relevant',
+              '',
+              '## Agent OS',
+              '',
+              '- Spec:',
+              '- Standards:',
+              '',
+              '## Notes',
+              '',
+              '- This PR was opened automatically by GitHub Actions.',
+              '- Merge remains manual.',
+            ].join('\n');
+
+            let pr;
+            if (existing.data.length > 0) {
+              pr = existing.data[0];
+              await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: pr.number,
+                body,
+                maintainer_can_modify: true,
+              });
+            } else {
+              const created = await github.rest.pulls.create({
+                owner,
+                repo,
+                title,
+                head,
+                base,
+                body,
+                draft: true,
+                maintainer_can_modify: true,
+              });
+              pr = created.data;
+            }
+
+            core.setOutput('number', pr.number);
+            core.setOutput('url', pr.html_url);
+
+      - name: Add bot review comment
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = Number(process.env.PR_NUMBER);
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+
+            const fileList = files
+              .slice(0, 40)
+              .map((file) => `- \`${file.filename}\` (+${file.additions}/-${file.deletions})`)
+              .join('\n');
+
+            const body = [
+              '## Bot Review',
+              '',
+              'Automated review checklist for this PR:',
+              '',
+              '- [ ] PR has a focused branch and commit scope.',
+              '- [ ] Agent OS spec is referenced when implementation work is included.',
+              '- [ ] Backend changes follow `backend/spring` and `api/rest` standards.',
+              '- [ ] Frontend changes follow `frontend/react` standards.',
+              '- [ ] Tests or manual validation are documented.',
+              '- [ ] No secrets, local storage files, build outputs, or audio files are included.',
+              '',
+              '### Changed Files',
+              '',
+              fileList || '- No files detected.',
+              '',
+              '> This is an automated checklist review. Final review and merge remain manual.',
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pull_number,
+              body,
+            });
+
