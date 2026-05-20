@@ -253,6 +253,7 @@ jobs:
               .join('\n');
 
             const body = [
+              `<!-- voys-auto-review:${head} -->`,
               `## 리뷰: ${head}`,
               '',
               `PR #${pull_number} / 이슈 #${issue_number} 자동 검증 결과입니다.`,
@@ -270,6 +271,27 @@ jobs:
               '',
               '> 이 코멘트는 자동 체크리스트 리뷰입니다. 최종 리뷰와 merge는 수동으로 진행합니다.',
             ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pull_number,
+              per_page: 100,
+            });
+
+            for (const comment of comments) {
+              const isPreviousAutoReview =
+                comment.body?.includes(`<!-- voys-auto-review:${head} -->`) ||
+                comment.body?.startsWith(`## 리뷰: ${head}`);
+
+              if (isPreviousAutoReview) {
+                await github.rest.issues.deleteComment({
+                  owner,
+                  repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
 
             await github.rest.issues.createComment({
               owner,

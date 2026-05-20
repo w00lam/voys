@@ -120,6 +120,8 @@ Automated PR and issue titles should use a Korean type prefix:
 문서: Architecture Decisions
 ```
 
+Automated review comments should be de-duplicated. Before writing a new automated review, the workflow should delete earlier comments for the same branch review marker.
+
 ## Main Branch Rules
 
 - `main` should remain runnable.
