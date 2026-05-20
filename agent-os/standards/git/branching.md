@@ -83,6 +83,8 @@ Automatic PR creation applies to:
 
 The bot review is a guardrail, not approval. It can point out missing specs, risky files, workflow changes, and validation gaps, but the final review and merge decision belongs to `@w00lam`.
 
+Automated PR, issue, and review comments should use the repository secret `VOYS_REVIEW_TOKEN` so GitHub records them as `@w00lam` rather than `github-actions[bot]`. The token should be fine-grained and limited to this repository with read-only contents plus read/write issues and pull requests.
+
 Automated review comments should use branch-specific titles like:
 
 ```text
