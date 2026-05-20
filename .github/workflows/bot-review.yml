@@ -1,0 +1,114 @@
+name: Bot Review
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    name: Review checklist
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Add review comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.VOYS_REVIEW_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = context.payload.pull_request.number;
+            const head = context.payload.pull_request.head.ref;
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+
+            const hasAgentSpec = files.some((file) => file.filename.startsWith('agent-os/specs/'));
+            const hasBackend = files.some((file) => file.filename.startsWith('backend/'));
+            const hasFrontend = files.some((file) => file.filename.startsWith('frontend/'));
+            const hasWorkflow = files.some((file) => file.filename.startsWith('.github/workflows/'));
+            const riskyFiles = files.filter((file) =>
+              file.filename.includes('.env') && file.filename !== '.env.example'
+            );
+
+            const findings = [];
+
+            if ((hasBackend || hasFrontend) && !hasAgentSpec) {
+              findings.push('- 구현 파일이 변경되었지만 Agent OS spec 변경이 없습니다. 기존 spec이 이 작업을 포괄하는지 확인하세요.');
+            }
+
+            if (riskyFiles.length > 0) {
+              findings.push(`- secret이 포함될 수 있는 환경 파일이 변경되었습니다: ${riskyFiles.map((file) => `\`${file.filename}\``).join(', ')}`);
+            }
+
+            if (hasWorkflow) {
+              findings.push('- GitHub workflow 파일이 변경되었습니다. 권한과 trigger 동작을 신중하게 확인하세요.');
+            }
+
+            const body = [
+              `<!-- voys-auto-review:${head} -->`,
+              `## 리뷰: ${head}`,
+              '',
+              '### 발견 사항',
+              '',
+              findings.length > 0 ? findings.join('\n') : '- 자동 체크리스트에서 blocking 항목은 발견되지 않았습니다.',
+              '',
+              '### 체크리스트',
+              '',
+              '- [ ] 작업 범위가 명확하고 브랜치명과 맞습니다.',
+              '- [ ] Agent OS standards를 따릅니다.',
+              '- [ ] PR에 테스트 또는 수동 검증이 설명되어 있습니다.',
+              '- [ ] merge는 사람이 최종 결정합니다.',
+              '',
+              '### 컨텍스트',
+              '',
+              `- 백엔드 파일 변경: ${hasBackend ? '예' : '아니오'}`,
+              `- 프론트엔드 파일 변경: ${hasFrontend ? '예' : '아니오'}`,
+              `- Agent OS spec 변경: ${hasAgentSpec ? '예' : '아니오'}`,
+              `- workflow 파일 변경: ${hasWorkflow ? '예' : '아니오'}`,
+              '',
+              '> 이 자동 리뷰는 가드레일이며 승인 의미가 아닙니다.',
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pull_number,
+              per_page: 100,
+            });
+
+            for (const comment of comments) {
+              const isPreviousAutoReview =
+                comment.body?.includes(`<!-- voys-auto-review:${head} -->`) ||
+                comment.body?.startsWith(`## 리뷰: ${head}`);
+
+              if (isPreviousAutoReview) {
+                await github.rest.issues.deleteComment({
+                  owner,
+                  repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pull_number,
+              body,
+            });
