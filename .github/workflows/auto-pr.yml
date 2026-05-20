@@ -179,6 +179,7 @@ jobs:
                 owner,
                 repo,
                 pull_number: pr.number,
+                title,
                 body,
               });
             } else {
