@@ -1,2 +1,43 @@
 # Agent OS Standards Index
 
+standards:
+  - id: backend/spring
+    path: backend/spring.md
+    title: Spring Backend Standards
+    applies_to:
+      - Spring Boot backend implementation
+      - authentication and authorization
+      - persistence and transactions
+      - local storage and Whisper integration
+  - id: api/rest
+    path: api/rest.md
+    title: REST API Standards
+    applies_to:
+      - REST API design
+      - API request and response DTOs
+      - API errors
+      - uploads, transcription status, and search endpoints
+  - id: frontend/react
+    path: frontend/react.md
+    title: React Frontend Standards
+    applies_to:
+      - React and Vite frontend implementation
+      - browser recording UI
+      - session cookie API calls
+      - upload, transcription status, transcript, and search UI
+  - id: testing/testing
+    path: testing/testing.md
+    title: Testing Standards
+    applies_to:
+      - backend unit and integration tests
+      - frontend tests
+      - storage and Whisper adapter tests
+      - MVP manual verification
+  - id: git/branching
+    path: git/branching.md
+    title: Git Branching Standards
+    applies_to:
+      - branch naming
+      - commits and pull requests
+      - main branch protection expectations
+      - bootstrap and feature workflow

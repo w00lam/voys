@@ -23,3 +23,22 @@ cd /mnt/c/Users/woo_lam/IdeaProjects/voys
 ~/agent-os/scripts/project-install.sh
 ```
 
+## Local Development
+
+Backend:
+
+```bash
+docker compose up -d postgres
+cd backend
+./gradlew bootRun
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The Vite dev server proxies `/api` requests to the Spring Boot backend at `http://localhost:8080`.
