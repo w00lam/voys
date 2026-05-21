@@ -14,6 +14,7 @@ import com.voys.identity.domain.DuplicateEmailException;
 import com.voys.memo.application.StoragePort.StorageException;
 import com.voys.memo.domain.InvalidRecordingException;
 import com.voys.memo.domain.MemoNotFoundException;
+import com.voys.search.domain.InvalidSearchQueryException;
 import com.voys.transcription.domain.TranscriptionAlreadyRunningException;
 import com.voys.transcription.domain.TranscriptionFailedException;
 
@@ -69,5 +70,11 @@ public class GlobalApiExceptionHandler {
 	ResponseEntity<ApiErrorResponse> transcriptionAlreadyRunning(TranscriptionAlreadyRunningException exception) {
 		return ResponseEntity.status(HttpStatus.CONFLICT)
 			.body(new ApiErrorResponse("transcription.already_running", exception.getMessage()));
+	}
+
+	@ExceptionHandler(InvalidSearchQueryException.class)
+	ResponseEntity<ApiErrorResponse> invalidSearchQuery(InvalidSearchQueryException exception) {
+		return ResponseEntity.badRequest()
+			.body(new ApiErrorResponse("search.query_blank", exception.getMessage()));
 	}
 }
