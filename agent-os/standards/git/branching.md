@@ -89,6 +89,8 @@ Working branch pushes should automatically open or update a draft PR against `ma
 
 If the branch name includes an issue number, the workflow should link that issue from the PR with `Closes #issue`. If no issue number is present, the workflow may create a fallback tracking issue and link that instead.
 
+For new work, prefer the `Start Work` GitHub Actions workflow. It creates the issue first and creates an issue-numbered branch from `main`.
+
 Automatic PR creation applies to:
 
 - `feature/**`

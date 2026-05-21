@@ -140,26 +140,129 @@ jobs:
               state: 'open',
             });
 
+            const comparison = await github.rest.repos.compareCommitsWithBasehead({
+              owner,
+              repo,
+              basehead: `${base}...${head}`,
+              per_page: 100,
+            });
+
+            const commitList = comparison.data.commits
+              .slice(-10)
+              .map((commit) => {
+                const message = commit.commit.message.split('\n')[0];
+                const shortSha = commit.sha.slice(0, 7);
+                return `- ${message} (${shortSha})`;
+              })
+              .join('\n');
+
+            const fileList = (comparison.data.files || [])
+              .slice(0, 30)
+              .map((file) => {
+                const status = {
+                  added: '추가',
+                  modified: '수정',
+                  removed: '삭제',
+                  renamed: '이름 변경',
+                }[file.status] || file.status;
+                return `- \`${file.filename}\` (${status}, +${file.additions}/-${file.deletions})`;
+              })
+              .join('\n');
+
+            const changedFiles = comparison.data.files || [];
+            const hasAutoPr = changedFiles.some((file) => file.filename === '.github/workflows/auto-pr.yml');
+            const hasBotReview = changedFiles.some((file) => file.filename === '.github/workflows/bot-review.yml');
+            const hasStartWork = changedFiles.some((file) => file.filename === '.github/workflows/start-work.yml');
+            const hasGitStandard = changedFiles.some((file) => file.filename === 'agent-os/standards/git/branching.md');
+            const hasBackend = changedFiles.some((file) => file.filename.startsWith('backend/'));
+            const hasFrontend = changedFiles.some((file) => file.filename.startsWith('frontend/'));
+
+            const changeSummary = [];
+            const reviewGuide = [];
+            const testGuide = [];
+
+            if (hasStartWork) {
+              changeSummary.push('- `Start Work` 수동 워크플로를 추가해 이슈를 먼저 만들고 이슈 번호가 포함된 작업 브랜치를 자동 생성합니다.');
+              reviewGuide.push('- `Start Work` 실행 시 `VOYS_REVIEW_TOKEN` 권한으로 이슈/라벨/브랜치가 생성되는지 확인합니다.');
+              reviewGuide.push('- 같은 slug를 다시 실행하거나 라벨이 없는 저장소에서 실행해도 실패하지 않는지 확인합니다.');
+            }
+
+            if (hasAutoPr) {
+              changeSummary.push('- 자동 PR 본문을 이슈, 브랜치, 변경 파일, 커밋 목록 중심으로 갱신해 작업 의도가 바로 보이게 합니다.');
+              reviewGuide.push('- 자동 PR 본문 갱신이 사용자가 직접 보완한 PR 내용을 의도치 않게 덮어쓰지 않는지 확인합니다.');
+              reviewGuide.push('- 브랜치명에 이슈 번호가 있는 경우 기존 이슈를 연결하고, 없는 경우 fallback 이슈를 만드는 흐름을 확인합니다.');
+            }
+
+            if (hasBotReview) {
+              changeSummary.push('- 자동 리뷰 코멘트를 하나의 워크플로로 모으고, 변경 파일 유형에 맞춘 리뷰 포커스를 남기도록 개선합니다.');
+              reviewGuide.push('- 자동 리뷰 코멘트가 push마다 중복으로 쌓이지 않고 이전 코멘트를 교체하는지 확인합니다.');
+              reviewGuide.push('- 리뷰 코멘트가 단순 체크리스트가 아니라 실제 확인해야 할 리스크를 충분히 드러내는지 확인합니다.');
+            }
+
+            if (hasGitStandard) {
+              changeSummary.push('- Git 브랜치/PR 전략 문서에 이슈 우선 작업 흐름과 자동화 사용 방식을 반영합니다.');
+            }
+
+            if (hasBackend) {
+              testGuide.push('- Backend CI 또는 `backend/gradlew.bat test` 결과를 확인합니다.');
+            }
+
+            if (hasFrontend) {
+              testGuide.push('- Frontend CI 또는 `npm run build` 결과를 확인합니다.');
+            }
+
+            if (changedFiles.some((file) => file.filename.startsWith('.github/workflows/'))) {
+              testGuide.push('- GitHub Actions에서 `Auto PR`, `Bot Review`, `CI`가 각각 의도대로 실행되는지 확인합니다.');
+            }
+
+            const issueSummary = (issue.body || '')
+              .split('\n')
+              .map((line) => line.trim())
+              .filter((line) =>
+                line &&
+                !line.startsWith('## ') &&
+                !line.startsWith('- [ ]') &&
+                !line.startsWith('- PR:')
+              )
+              .slice(0, 12)
+              .join('\n');
+
+            const workGoal = [
+              `- ${readableTitle} 작업을 완료합니다.`,
+              issueSummary ? `- 이슈 내용: ${issueSummary.replace(/\n/g, ' / ')}` : '',
+            ].filter(Boolean).join('\n');
+
             const title = generatedTitle;
             const body = [
               '## 요약',
               '',
-              `- \`${head}\` 브랜치에 대해 자동 생성된 PR입니다.`,
+              `- ${issue.title}`,
+              `- 브랜치: \`${head}\``,
               `- Closes #${issue.number}`,
               '',
-              '## 배경',
+              '## 작업 목표',
               '',
-              '- 짧은 작업 브랜치에서 변경을 진행하고, 리뷰 후 수동으로 merge하기 위한 PR입니다.',
+              workGoal,
               '',
-              '## 변경 사항',
+              '## 이번 PR에서 하는 일',
               '',
-              '- 자세한 내용은 commit diff를 확인합니다.',
+              changeSummary.length > 0 ? changeSummary.join('\n') : '- 변경 파일과 커밋을 기준으로 작업 내용을 확인합니다.',
+              '',
+              '## 리뷰할 때 볼 부분',
+              '',
+              reviewGuide.length > 0 ? reviewGuide.join('\n') : '- PR 본문, 변경 파일, 커밋 범위가 같은 작업을 설명하는지 확인합니다.',
+              '',
+              '## 변경 파일',
+              '',
+              fileList || '- 아직 감지된 변경 파일이 없습니다.',
+              '',
+              '## 커밋',
+              '',
+              commitList || '- 아직 감지된 커밋이 없습니다.',
               '',
               '## 검증',
               '',
-              '- [ ] 백엔드 테스트 통과',
-              '- [ ] 프론트엔드 빌드 통과',
-              '- [ ] 필요한 수동 검증 완료',
+              testGuide.length > 0 ? testGuide.join('\n') : '- PR 성격에 맞는 CI 또는 수동 검증을 확인합니다.',
               '',
               '## Agent OS',
               '',
@@ -225,77 +328,3 @@ jobs:
             core.setOutput('number', pr.number);
             core.setOutput('url', pr.html_url);
             core.setOutput('issue_number', issue.number);
-
-      - name: Add bot review comment
-        uses: actions/github-script@v7
-        env:
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          ISSUE_NUMBER: ${{ steps.pr.outputs.issue_number }}
-        with:
-          github-token: ${{ secrets.VOYS_REVIEW_TOKEN }}
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const pull_number = Number(process.env.PR_NUMBER);
-            const issue_number = Number(process.env.ISSUE_NUMBER);
-            const head = context.ref.replace('refs/heads/', '');
-
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner,
-              repo,
-              pull_number,
-              per_page: 100,
-            });
-
-            const fileList = files
-              .slice(0, 40)
-              .map((file) => `- \`${file.filename}\` (+${file.additions}/-${file.deletions})`)
-              .join('\n');
-
-            const body = [
-              `<!-- voys-auto-review:${head} -->`,
-              `## 리뷰: ${head}`,
-              '',
-              `PR #${pull_number} / 이슈 #${issue_number} 자동 검증 결과입니다.`,
-              '',
-              '- [ ] PR 브랜치와 커밋 범위가 명확합니다.',
-              '- [ ] 구현 작업이 포함된 경우 Agent OS spec이 참조되었습니다.',
-              '- [ ] 백엔드 변경은 `backend/spring`, `api/rest` standards를 따릅니다.',
-              '- [ ] 프론트엔드 변경은 `frontend/react` standards를 따릅니다.',
-              '- [ ] 테스트 또는 수동 검증 내용이 문서화되었습니다.',
-              '- [ ] secret, 로컬 저장 파일, 빌드 산출물, 오디오 파일이 포함되지 않았습니다.',
-              '',
-              '### 변경 파일',
-              '',
-              fileList || '- No files detected.',
-              '',
-              '> 이 코멘트는 자동 체크리스트 리뷰입니다. 최종 리뷰와 merge는 수동으로 진행합니다.',
-            ].join('\n');
-
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number: pull_number,
-              per_page: 100,
-            });
-
-            for (const comment of comments) {
-              const isPreviousAutoReview =
-                comment.body?.includes(`<!-- voys-auto-review:${head} -->`) ||
-                comment.body?.startsWith(`## 리뷰: ${head}`);
-
-              if (isPreviousAutoReview) {
-                await github.rest.issues.deleteComment({
-                  owner,
-                  repo,
-                  comment_id: comment.id,
-                });
-              }
-            }
-
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number: pull_number,
-              body,
-            });
