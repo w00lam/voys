@@ -38,7 +38,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Create issue and branch
+      - name: Create issue
+        id: issue
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.VOYS_REVIEW_TOKEN }}
@@ -115,6 +116,34 @@ jobs:
             const issueNumber = issue.data.number;
             const branchName = `${type}/${issueNumber}-${slug}`;
 
+            core.setOutput('issue_number', String(issueNumber));
+            core.setOutput('issue_url', issue.data.html_url);
+            core.setOutput('issue_body', issueBody);
+            core.setOutput('branch_name', branchName);
+            core.setOutput('title', title);
+            core.setOutput('type_label', typeLabels[type] || '작업');
+
+      - name: Create branch and update issue
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ steps.issue.outputs.issue_number }}
+          ISSUE_URL: ${{ steps.issue.outputs.issue_url }}
+          ISSUE_BODY: ${{ steps.issue.outputs.issue_body }}
+          BRANCH_NAME: ${{ steps.issue.outputs.branch_name }}
+          ISSUE_TITLE: ${{ steps.issue.outputs.title }}
+          TYPE_LABEL: ${{ steps.issue.outputs.type_label }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = Number(process.env.ISSUE_NUMBER);
+            const issueUrl = process.env.ISSUE_URL;
+            const branchName = process.env.BRANCH_NAME;
+            const title = process.env.ISSUE_TITLE;
+            const typeLabel = process.env.TYPE_LABEL;
+            const issueBody = process.env.ISSUE_BODY;
+
             const mainRef = await github.rest.git.getRef({
               owner,
               repo,
@@ -149,10 +178,10 @@ jobs:
             });
 
             core.summary
-              .addHeading(`${typeLabels[type] || '작업'} 시작`)
+              .addHeading(`${typeLabel} 시작`)
               .addList([
                 `이슈: #${issueNumber} ${title}`,
                 `브랜치: ${branchName}`,
-                `이슈 URL: ${issue.data.html_url}`,
+                `이슈 URL: ${issueUrl}`,
               ])
               .write();
