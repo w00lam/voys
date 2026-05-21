@@ -45,10 +45,11 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const type = core.getInput('type');
-            const title = core.getInput('title');
-            const slugInput = core.getInput('slug');
-            const bodyInput = core.getInput('body');
+            const inputs = context.payload.inputs || {};
+            const type = inputs.type || 'feature';
+            const title = inputs.title || '';
+            const slugInput = inputs.slug || '';
+            const bodyInput = inputs.body || '';
 
             const typeLabels = {
               feature: '기능',
