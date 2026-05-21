@@ -1,4 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+let csrfToken: string | null = null;
+let csrfHeaderName = 'X-XSRF-TOKEN';
 
 export type ApiError = {
   code: string;
@@ -16,6 +18,59 @@ export async function apiGet<T>(path: string): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+export async function apiPost<TResponse, TBody extends object | undefined = object>(
+  path: string,
+  body?: TBody,
+): Promise<TResponse> {
+  await ensureCsrfToken();
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      [csrfHeaderName]: csrfToken ?? '',
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  if (response.status === 204) {
+    return undefined as TResponse;
+  }
+
+  return response.json() as Promise<TResponse>;
+}
+
+export function getErrorMessage(error: unknown): string {
+  if (isApiError(error)) {
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Request failed.';
+}
+
+async function ensureCsrfToken(): Promise<void> {
+  if (csrfToken) {
+    return;
+  }
+
+  const token = await apiGet<{ headerName: string; token: string }>('/api/auth/csrf');
+  csrfHeaderName = token.headerName;
+  csrfToken = token.token;
+}
+
+function isApiError(error: unknown): error is ApiError {
+  return typeof error === 'object' && error !== null && 'code' in error && 'message' in error;
 }
 
 async function toApiError(response: Response): Promise<ApiError> {
