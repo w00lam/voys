@@ -35,6 +35,79 @@ h1 {
   line-height: 1.6;
 }
 
+.auth-panel {
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 7px;
+  color: #424b59;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.auth-form input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cfd6e2;
+  border-radius: 8px;
+  padding: 11px 12px;
+  color: #20242c;
+  font: inherit;
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mode-switch button {
+  width: 100%;
+  min-width: 0;
+  background: #e8edf3;
+  color: #334155;
+}
+
+.mode-switch button.active {
+  background: #2f5f46;
+  color: #ffffff;
+}
+
+.signed-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.signed-in div {
+  display: grid;
+  gap: 4px;
+}
+
+.label {
+  color: #4f6f52;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.muted {
+  color: #687486;
+}
+
 .status-panel {
   display: flex;
   align-items: center;
@@ -96,6 +169,11 @@ button:disabled {
   }
 
   .status-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .signed-in {
     align-items: stretch;
     flex-direction: column;
   }
