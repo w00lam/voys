@@ -140,20 +140,60 @@ jobs:
               state: 'open',
             });
 
+            const comparison = await github.rest.repos.compareCommitsWithBasehead({
+              owner,
+              repo,
+              basehead: `${base}...${head}`,
+              per_page: 100,
+            });
+
+            const commitList = comparison.data.commits
+              .slice(-10)
+              .map((commit) => {
+                const message = commit.commit.message.split('\n')[0];
+                const shortSha = commit.sha.slice(0, 7);
+                return `- ${message} (${shortSha})`;
+              })
+              .join('\n');
+
+            const fileList = (comparison.data.files || [])
+              .slice(0, 30)
+              .map((file) => {
+                const status = {
+                  added: '추가',
+                  modified: '수정',
+                  removed: '삭제',
+                  renamed: '이름 변경',
+                }[file.status] || file.status;
+                return `- \`${file.filename}\` (${status}, +${file.additions}/-${file.deletions})`;
+              })
+              .join('\n');
+
+            const issueSummary = (issue.body || '')
+              .split('\n')
+              .filter((line) => line.trim() && !line.trim().startsWith('- [ ]'))
+              .slice(0, 12)
+              .join('\n');
+
             const title = generatedTitle;
             const body = [
               '## 요약',
               '',
-              `- \`${head}\` 브랜치에 대해 자동 생성된 PR입니다.`,
+              `- ${issue.title}`,
+              `- 브랜치: \`${head}\``,
               `- Closes #${issue.number}`,
               '',
-              '## 배경',
+              '## 작업 목표',
               '',
-              '- 짧은 작업 브랜치에서 변경을 진행하고, 리뷰 후 수동으로 merge하기 위한 PR입니다.',
+              issueSummary || `- \`${head}\` 브랜치 작업을 완료합니다.`,
               '',
               '## 변경 사항',
               '',
-              '- 자세한 내용은 commit diff를 확인합니다.',
+              fileList || '- 아직 감지된 변경 파일이 없습니다.',
+              '',
+              '## 커밋',
+              '',
+              commitList || '- 아직 감지된 커밋이 없습니다.',
               '',
               '## 검증',
               '',
