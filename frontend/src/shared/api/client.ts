@@ -47,6 +47,25 @@ export async function apiPost<TResponse, TBody extends object | undefined = obje
   return response.json() as Promise<TResponse>;
 }
 
+export async function apiPostForm<TResponse>(path: string, body: FormData): Promise<TResponse> {
+  await ensureCsrfToken();
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      [csrfHeaderName]: csrfToken ?? '',
+    },
+    body,
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return response.json() as Promise<TResponse>;
+}
+
 export function getErrorMessage(error: unknown): string {
   if (isApiError(error)) {
     return error.message;

@@ -108,6 +108,26 @@ h1 {
   color: #687486;
 }
 
+.recorder-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e4e8ef;
+}
+
+.recorder-panel h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.recorder-panel p {
+  margin: 0;
+  color: #687486;
+}
+
 .status-panel {
   display: flex;
   align-items: center;
@@ -145,6 +165,10 @@ button:disabled {
   opacity: 0.7;
 }
 
+button.danger {
+  background: #9f3434;
+}
+
 .result {
   margin-top: 16px;
   padding: 14px 16px;
@@ -173,7 +197,8 @@ button:disabled {
     flex-direction: column;
   }
 
-  .signed-in {
+  .signed-in,
+  .recorder-panel {
     align-items: stretch;
     flex-direction: column;
   }
