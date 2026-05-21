@@ -171,9 +171,15 @@ jobs:
 
             const issueSummary = (issue.body || '')
               .split('\n')
-              .filter((line) => line.trim() && !line.trim().startsWith('- [ ]'))
+              .map((line) => line.trim())
+              .filter((line) => line && !line.startsWith('## ') && !line.startsWith('- [ ]'))
               .slice(0, 12)
               .join('\n');
+
+            const workGoal = [
+              `- ${readableTitle} 작업을 완료합니다.`,
+              issueSummary ? `- 이슈 내용: ${issueSummary.replace(/\n/g, ' / ')}` : '',
+            ].filter(Boolean).join('\n');
 
             const title = generatedTitle;
             const body = [
@@ -185,7 +191,7 @@ jobs:
               '',
               '## 작업 목표',
               '',
-              issueSummary || `- \`${head}\` 브랜치 작업을 완료합니다.`,
+              workGoal,
               '',
               '## 변경 사항',
               '',
