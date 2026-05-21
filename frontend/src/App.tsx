@@ -130,6 +130,61 @@ function App() {
     return () => window.clearInterval(intervalId);
   }, [recorder.status]);
 
+  useEffect(() => {
+    if (playback.status !== 'ready' || transcript.status !== 'ready') {
+      return undefined;
+    }
+
+    const currentMemoId = playback.memo.id;
+    const currentStatus = transcript.transcript.status;
+
+    if (currentStatus !== 'PENDING' && currentStatus !== 'PROCESSING') {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(async () => {
+      try {
+        const updatedTranscript = await getTranscript(currentMemoId);
+
+        setTranscript((prevTranscript) => {
+          if (prevTranscript.status === 'ready' && prevTranscript.transcript.memoId === currentMemoId) {
+            if (updatedTranscript.status === 'COMPLETED' || updatedTranscript.status === 'FAILED') {
+              void refreshMemos();
+
+              setPlayback((prevPlayback) => {
+                if (prevPlayback.status === 'ready' && prevPlayback.memo.id === currentMemoId) {
+                  return {
+                    ...prevPlayback,
+                    memo: {
+                      ...prevPlayback.memo,
+                      transcriptionStatus: updatedTranscript.status,
+                    },
+                  };
+                }
+                return prevPlayback;
+              });
+            }
+
+            return {
+              status: 'ready',
+              transcript: updatedTranscript,
+            };
+          }
+          return prevTranscript;
+        });
+      } catch (error) {
+        setTranscript({ status: 'failed', message: getErrorMessage(error) });
+      }
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [
+    playback.status,
+    playback.status === 'ready' ? playback.memo.id : null,
+    transcript.status,
+    transcript.status === 'ready' ? transcript.transcript.status : null,
+  ]);
+
   async function checkBackend() {
     setHealth({ status: 'loading' });
 
@@ -401,7 +456,8 @@ function App() {
                         <button
                           type="button"
                           onClick={submitTranscription}
-                          disabled={transcript.status === 'loading'}
+                          disabled={transcript.status === 'loading'
+                            || (transcript.status === 'ready' && transcript.transcript.status === 'PROCESSING')}
                         >
                           {transcript.status === 'loading' ? 'Transcribing...' : 'Start transcription'}
                         </button>
@@ -411,7 +467,13 @@ function App() {
                         <pre>{transcript.transcript.text}</pre>
                       )}
 
-                      {transcript.status === 'ready' && !transcript.transcript.text && (
+                      {transcript.status === 'ready' && transcript.transcript.status === 'FAILED' && (
+                        <p className="result failure">Transcription failed.</p>
+                      )}
+
+                      {transcript.status === 'ready'
+                        && transcript.transcript.status !== 'FAILED'
+                        && !transcript.transcript.text && (
                         <p className="muted">No transcript has been created yet.</p>
                       )}
 

@@ -37,7 +37,7 @@ describe('App transcription polling', () => {
     });
 
     expect(screen.getByText('Final transcript text from the background worker.')).toBeInTheDocument();
-    expect(screen.getByText(/completed/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/completed/i).length).toBeGreaterThan(0);
     expect(transcriptFetchCount(fetchMock)).toBeGreaterThanOrEqual(3);
   });
 
