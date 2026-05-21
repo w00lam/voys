@@ -44,7 +44,7 @@ coverage/
 # Runtime / temp files
 tmp/
 temp/
-storage/
+/storage/
 *.pid
 *.seed
 *.stackdump

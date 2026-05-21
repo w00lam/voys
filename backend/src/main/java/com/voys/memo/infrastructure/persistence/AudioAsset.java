@@ -76,4 +76,24 @@ public class AudioAsset {
 	void prePersist() {
 		createdAt = Instant.now();
 	}
+
+	public String getStorageKey() {
+		return storageKey;
+	}
+
+	public String getContentType() {
+		return contentType;
+	}
+
+	public long getSizeBytes() {
+		return sizeBytes;
+	}
+
+	public String getOriginalFilename() {
+		return originalFilename;
+	}
+
+	public Integer getDurationSeconds() {
+		return durationSeconds;
+	}
 }

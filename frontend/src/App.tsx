@@ -8,6 +8,13 @@ import {
   type CurrentUser,
 } from './features/auth/api';
 import { getHealth, type HealthResponse } from './features/health/api';
+import {
+  getMemo,
+  getMemoAudio,
+  listMemos,
+  type MemoDetail,
+  type MemoSummary,
+} from './features/memos/api';
 import { uploadRecording, type CreatedMemo } from './features/recorder/api';
 import { getErrorMessage } from './shared/api/client';
 
@@ -29,6 +36,18 @@ type RecorderState =
   | { status: 'uploaded'; memo: CreatedMemo }
   | { status: 'failed'; message: string };
 
+type MemoState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; memos: MemoSummary[] }
+  | { status: 'failed'; message: string };
+
+type PlaybackState =
+  | { status: 'idle' }
+  | { status: 'loading'; memoId: string }
+  | { status: 'ready'; memo: MemoDetail; audioUrl: string }
+  | { status: 'failed'; message: string };
+
 function App() {
   const [health, setHealth] = useState<HealthState>({ status: 'idle' });
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
@@ -39,6 +58,8 @@ function App() {
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recorder, setRecorder] = useState<RecorderState>({ status: 'idle' });
+  const [memoState, setMemoState] = useState<MemoState>({ status: 'idle' });
+  const [playback, setPlayback] = useState<PlaybackState>({ status: 'idle' });
 
   useEffect(() => {
     let active = true;
@@ -59,6 +80,23 @@ function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (auth.status === 'authenticated') {
+      void refreshMemos();
+    } else if (auth.status === 'guest') {
+      setMemoState({ status: 'idle' });
+      setPlayback({ status: 'idle' });
+    }
+  }, [auth.status]);
+
+  useEffect(() => {
+    return () => {
+      if (playback.status === 'ready') {
+        URL.revokeObjectURL(playback.audioUrl);
+      }
+    };
+  }, [playback]);
 
   useEffect(() => {
     if (recorder.status !== 'recording') {
@@ -104,6 +142,7 @@ function App() {
         : await login({ email, password });
 
       setAuth({ status: 'authenticated', user });
+      await refreshMemos();
       setPassword('');
       setAuthMessage(mode === 'signup' ? 'Account created.' : 'Logged in.');
     } catch (error) {
@@ -120,6 +159,8 @@ function App() {
     try {
       await logout();
       setAuth({ status: 'guest' });
+      setMemoState({ status: 'idle' });
+      setPlayback({ status: 'idle' });
       setAuthMessage('Logged out.');
     } catch (error) {
       setAuthMessage(getErrorMessage(error));
@@ -161,6 +202,7 @@ function App() {
           const durationSeconds = Math.max(1, Math.floor((Date.now() - startedAt) / 1000));
           const memo = await uploadRecording(audio, durationSeconds);
           setRecorder({ status: 'uploaded', memo });
+          await refreshMemos();
         } catch (error) {
           setRecorder({ status: 'failed', message: getErrorMessage(error) });
         }
@@ -176,6 +218,32 @@ function App() {
   function stopRecording() {
     if (recorder.status === 'recording') {
       recorder.recorder.stop();
+    }
+  }
+
+  async function refreshMemos() {
+    setMemoState({ status: 'loading' });
+
+    try {
+      const memos = await listMemos();
+      setMemoState({ status: 'ready', memos });
+    } catch (error) {
+      setMemoState({ status: 'failed', message: getErrorMessage(error) });
+    }
+  }
+
+  async function selectMemo(memoId: string) {
+    if (playback.status === 'ready') {
+      URL.revokeObjectURL(playback.audioUrl);
+    }
+
+    setPlayback({ status: 'loading', memoId });
+
+    try {
+      const [memo, audio] = await Promise.all([getMemo(memoId), getMemoAudio(memoId)]);
+      setPlayback({ status: 'ready', memo, audioUrl: URL.createObjectURL(audio) });
+    } catch (error) {
+      setPlayback({ status: 'failed', message: getErrorMessage(error) });
     }
   }
 
@@ -232,6 +300,64 @@ function App() {
               {recorder.status === 'failed' && (
                 <p className="result failure">{recorder.message}</p>
               )}
+
+              <div className="library-panel">
+                <div className="library-heading">
+                  <div>
+                    <h2>Saved memos</h2>
+                    <p>Browse recordings saved to your account.</p>
+                  </div>
+                  <button type="button" onClick={refreshMemos} disabled={memoState.status === 'loading'}>
+                    {memoState.status === 'loading' ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
+
+                {memoState.status === 'ready' && memoState.memos.length === 0 && (
+                  <p className="muted">No recordings saved yet.</p>
+                )}
+
+                {memoState.status === 'ready' && memoState.memos.length > 0 && (
+                  <ul className="memo-list">
+                    {memoState.memos.map((memo) => (
+                      <li key={memo.id}>
+                        <button type="button" onClick={() => selectMemo(memo.id)}>
+                          <span>{memo.title}</span>
+                          <small>
+                            {memo.transcriptionStatus.toLowerCase()} · {formatBytes(memo.audioSizeBytes)}
+                          </small>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {memoState.status === 'failed' && (
+                  <p className="result failure">{memoState.message}</p>
+                )}
+
+                {playback.status === 'loading' && (
+                  <p className="muted">Loading selected memo...</p>
+                )}
+
+                {playback.status === 'ready' && (
+                  <div className="playback-panel">
+                    <div>
+                      <span className="label">Selected memo</span>
+                      <strong>{playback.memo.title}</strong>
+                      <span className="muted">
+                        {new Date(playback.memo.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <audio controls src={playback.audioUrl}>
+                      <track kind="captions" />
+                    </audio>
+                  </div>
+                )}
+
+                {playback.status === 'failed' && (
+                  <p className="result failure">{playback.message}</p>
+                )}
+              </div>
             </>
           )}
 
@@ -327,6 +453,18 @@ function formatDuration(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
   const seconds = (totalSeconds % 60).toString().padStart(2, '0');
   return `${minutes}:${seconds}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 export default App;

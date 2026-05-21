@@ -79,6 +79,10 @@ public class VoiceMemo {
 		return id;
 	}
 
+	public UserAccount getOwner() {
+		return owner;
+	}
+
 	public String getTitle() {
 		return title;
 	}
@@ -93,5 +97,9 @@ public class VoiceMemo {
 
 	public Instant getCreatedAt() {
 		return createdAt;
+	}
+
+	public Instant getUpdatedAt() {
+		return updatedAt;
 	}
 }
