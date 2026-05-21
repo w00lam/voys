@@ -45,6 +45,7 @@ class LocalFileStorageAdapterTests {
 		var resource = adapter.get(stored.storageKey());
 
 		assertThat(resource.contentLength()).isEqualTo(5);
+		assertThat(resource.localPath()).startsWith(storageRoot);
 		assertThat(resource.resource().getContentAsString(java.nio.charset.StandardCharsets.UTF_8))
 			.isEqualTo("audio");
 	}
