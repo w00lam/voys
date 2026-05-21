@@ -95,6 +95,18 @@ public class VoiceMemo {
 		return transcriptionStatus;
 	}
 
+	public void markTranscriptionProcessing() {
+		transcriptionStatus = TranscriptionStatus.PROCESSING;
+	}
+
+	public void markTranscriptionCompleted() {
+		transcriptionStatus = TranscriptionStatus.COMPLETED;
+	}
+
+	public void markTranscriptionFailed() {
+		transcriptionStatus = TranscriptionStatus.FAILED;
+	}
+
 	public Instant getCreatedAt() {
 		return createdAt;
 	}

@@ -47,7 +47,7 @@ public class LocalFileStorageAdapter implements StoragePort {
 				throw new IllegalArgumentException("Stored object was not found.");
 			}
 
-			return new StoredResource(new FileSystemResource(target), Files.size(target));
+			return new StoredResource(new FileSystemResource(target), Files.size(target), target);
 		} catch (IOException exception) {
 			throw new StorageException("Failed to read stored recording.", exception);
 		}

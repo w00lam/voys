@@ -14,6 +14,7 @@ import com.voys.identity.domain.DuplicateEmailException;
 import com.voys.memo.application.StoragePort.StorageException;
 import com.voys.memo.domain.InvalidRecordingException;
 import com.voys.memo.domain.MemoNotFoundException;
+import com.voys.transcription.domain.TranscriptionFailedException;
 
 @RestControllerAdvice
 public class GlobalApiExceptionHandler {
@@ -55,5 +56,11 @@ public class GlobalApiExceptionHandler {
 	ResponseEntity<ApiErrorResponse> memoNotFound() {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
 			.body(new ApiErrorResponse("memo.not_found", "Memo was not found."));
+	}
+
+	@ExceptionHandler(TranscriptionFailedException.class)
+	ResponseEntity<ApiErrorResponse> transcriptionFailed(TranscriptionFailedException exception) {
+		return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+			.body(new ApiErrorResponse("transcription.failed", "Transcription failed."));
 	}
 }

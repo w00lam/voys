@@ -2,6 +2,7 @@ package com.voys.memo.application;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 
 import org.springframework.core.io.Resource;
 
@@ -25,7 +26,8 @@ public interface StoragePort {
 
 	record StoredResource(
 		Resource resource,
-		long contentLength
+		long contentLength,
+		Path localPath
 	) {
 	}
 

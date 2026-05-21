@@ -11,9 +11,12 @@ import { getHealth, type HealthResponse } from './features/health/api';
 import {
   getMemo,
   getMemoAudio,
+  getTranscript,
   listMemos,
+  startTranscription,
   type MemoDetail,
   type MemoSummary,
+  type TranscriptResponse,
 } from './features/memos/api';
 import { uploadRecording, type CreatedMemo } from './features/recorder/api';
 import { getErrorMessage } from './shared/api/client';
@@ -48,6 +51,12 @@ type PlaybackState =
   | { status: 'ready'; memo: MemoDetail; audioUrl: string }
   | { status: 'failed'; message: string };
 
+type TranscriptState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; transcript: TranscriptResponse }
+  | { status: 'failed'; message: string };
+
 function App() {
   const [health, setHealth] = useState<HealthState>({ status: 'idle' });
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
@@ -60,6 +69,7 @@ function App() {
   const [recorder, setRecorder] = useState<RecorderState>({ status: 'idle' });
   const [memoState, setMemoState] = useState<MemoState>({ status: 'idle' });
   const [playback, setPlayback] = useState<PlaybackState>({ status: 'idle' });
+  const [transcript, setTranscript] = useState<TranscriptState>({ status: 'idle' });
 
   useEffect(() => {
     let active = true;
@@ -87,6 +97,7 @@ function App() {
     } else if (auth.status === 'guest') {
       setMemoState({ status: 'idle' });
       setPlayback({ status: 'idle' });
+      setTranscript({ status: 'idle' });
     }
   }, [auth.status]);
 
@@ -161,6 +172,7 @@ function App() {
       setAuth({ status: 'guest' });
       setMemoState({ status: 'idle' });
       setPlayback({ status: 'idle' });
+      setTranscript({ status: 'idle' });
       setAuthMessage('Logged out.');
     } catch (error) {
       setAuthMessage(getErrorMessage(error));
@@ -238,12 +250,36 @@ function App() {
     }
 
     setPlayback({ status: 'loading', memoId });
+    setTranscript({ status: 'loading' });
 
     try {
-      const [memo, audio] = await Promise.all([getMemo(memoId), getMemoAudio(memoId)]);
+      const [memo, audio, transcriptResult] = await Promise.all([
+        getMemo(memoId),
+        getMemoAudio(memoId),
+        getTranscript(memoId),
+      ]);
       setPlayback({ status: 'ready', memo, audioUrl: URL.createObjectURL(audio) });
+      setTranscript({ status: 'ready', transcript: transcriptResult });
     } catch (error) {
       setPlayback({ status: 'failed', message: getErrorMessage(error) });
+      setTranscript({ status: 'idle' });
+    }
+  }
+
+  async function submitTranscription() {
+    if (playback.status !== 'ready') {
+      return;
+    }
+
+    setTranscript({ status: 'loading' });
+
+    try {
+      const transcriptResult = await startTranscription(playback.memo.id);
+      setTranscript({ status: 'ready', transcript: transcriptResult });
+      await refreshMemos();
+    } catch (error) {
+      setTranscript({ status: 'failed', message: getErrorMessage(error) });
+      await refreshMemos();
     }
   }
 
@@ -351,6 +387,38 @@ function App() {
                     <audio controls src={playback.audioUrl}>
                       <track kind="captions" />
                     </audio>
+                    <div className="transcript-panel">
+                      <div className="library-heading">
+                        <div>
+                          <h2>Transcript</h2>
+                          <p>
+                            Status:{' '}
+                            {transcript.status === 'ready'
+                              ? transcript.transcript.status.toLowerCase()
+                              : playback.memo.transcriptionStatus.toLowerCase()}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={submitTranscription}
+                          disabled={transcript.status === 'loading'}
+                        >
+                          {transcript.status === 'loading' ? 'Transcribing...' : 'Start transcription'}
+                        </button>
+                      </div>
+
+                      {transcript.status === 'ready' && transcript.transcript.text && (
+                        <pre>{transcript.transcript.text}</pre>
+                      )}
+
+                      {transcript.status === 'ready' && !transcript.transcript.text && (
+                        <p className="muted">No transcript has been created yet.</p>
+                      )}
+
+                      {transcript.status === 'failed' && (
+                        <p className="result failure">{transcript.message}</p>
+                      )}
+                    </div>
                   </div>
                 )}
 
