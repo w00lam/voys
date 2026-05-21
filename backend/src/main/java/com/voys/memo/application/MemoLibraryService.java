@@ -1,0 +1,136 @@
+package com.voys.memo.application;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.voys.memo.domain.MemoNotFoundException;
+import com.voys.memo.infrastructure.persistence.AudioAsset;
+import com.voys.memo.infrastructure.persistence.AudioAssetRepository;
+import com.voys.memo.infrastructure.persistence.VoiceMemo;
+import com.voys.memo.infrastructure.persistence.VoiceMemoRepository;
+
+@Service
+public class MemoLibraryService {
+
+	private final VoiceMemoRepository voiceMemoRepository;
+	private final AudioAssetRepository audioAssetRepository;
+	private final StoragePort storagePort;
+
+	public MemoLibraryService(
+		VoiceMemoRepository voiceMemoRepository,
+		AudioAssetRepository audioAssetRepository,
+		StoragePort storagePort
+	) {
+		this.voiceMemoRepository = voiceMemoRepository;
+		this.audioAssetRepository = audioAssetRepository;
+		this.storagePort = storagePort;
+	}
+
+	@Transactional(readOnly = true)
+	public List<MemoSummary> listMemos(UUID ownerId) {
+		return voiceMemoRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId)
+			.stream()
+			.map(this::toSummary)
+			.toList();
+	}
+
+	@Transactional(readOnly = true)
+	public MemoDetail getMemo(UUID ownerId, UUID memoId) {
+		VoiceMemo memo = findOwnedMemo(ownerId, memoId);
+		AudioAsset audio = findAudio(memoId);
+		return MemoDetail.from(memo, audio);
+	}
+
+	@Transactional(readOnly = true)
+	public AudioDownload getAudio(UUID ownerId, UUID memoId) {
+		findOwnedMemo(ownerId, memoId);
+		AudioAsset audio = findAudio(memoId);
+		StoragePort.StoredResource stored = storagePort.get(audio.getStorageKey());
+		return new AudioDownload(stored.resource(), audio.getContentType(), stored.contentLength());
+	}
+
+	private MemoSummary toSummary(VoiceMemo memo) {
+		AudioAsset audio = findAudio(memo.getId());
+		return MemoSummary.from(memo, audio);
+	}
+
+	private VoiceMemo findOwnedMemo(UUID ownerId, UUID memoId) {
+		return voiceMemoRepository.findByIdAndOwnerId(memoId, ownerId)
+			.orElseThrow(() -> new MemoNotFoundException(memoId));
+	}
+
+	private AudioAsset findAudio(UUID memoId) {
+		return audioAssetRepository.findByMemoId(memoId)
+			.orElseThrow(() -> new MemoNotFoundException(memoId));
+	}
+
+	public record MemoSummary(
+		String id,
+		String title,
+		String recordingStatus,
+		String transcriptionStatus,
+		String createdAt,
+		Integer durationSeconds,
+		long audioSizeBytes
+	) {
+		static MemoSummary from(VoiceMemo memo, AudioAsset audio) {
+			return new MemoSummary(
+				memo.getId().toString(),
+				memo.getTitle(),
+				memo.getRecordingStatus().name(),
+				memo.getTranscriptionStatus().name(),
+				memo.getCreatedAt().toString(),
+				audio.getDurationSeconds(),
+				audio.getSizeBytes()
+			);
+		}
+	}
+
+	public record MemoDetail(
+		String id,
+		String title,
+		String recordingStatus,
+		String transcriptionStatus,
+		String createdAt,
+		String updatedAt,
+		AudioMetadata audio
+	) {
+		static MemoDetail from(VoiceMemo memo, AudioAsset audio) {
+			return new MemoDetail(
+				memo.getId().toString(),
+				memo.getTitle(),
+				memo.getRecordingStatus().name(),
+				memo.getTranscriptionStatus().name(),
+				memo.getCreatedAt().toString(),
+				memo.getUpdatedAt().toString(),
+				AudioMetadata.from(audio)
+			);
+		}
+	}
+
+	public record AudioMetadata(
+		String contentType,
+		long sizeBytes,
+		String originalFilename,
+		Integer durationSeconds
+	) {
+		static AudioMetadata from(AudioAsset audio) {
+			return new AudioMetadata(
+				audio.getContentType(),
+				audio.getSizeBytes(),
+				audio.getOriginalFilename(),
+				audio.getDurationSeconds()
+			);
+		}
+	}
+
+	public record AudioDownload(
+		org.springframework.core.io.Resource resource,
+		String contentType,
+		long contentLength
+	) {
+	}
+}

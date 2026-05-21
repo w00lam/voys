@@ -3,9 +3,13 @@ package com.voys.memo.application;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.springframework.core.io.Resource;
+
 public interface StoragePort {
 
 	StoredObject store(StoreObjectRequest request);
+
+	StoredResource get(String storageKey);
 
 	record StoreObjectRequest(
 		String folder,
@@ -16,6 +20,12 @@ public interface StoragePort {
 
 	record StoredObject(
 		String storageKey
+	) {
+	}
+
+	record StoredResource(
+		Resource resource,
+		long contentLength
 	) {
 	}
 

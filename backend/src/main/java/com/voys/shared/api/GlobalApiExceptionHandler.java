@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.voys.identity.domain.DuplicateEmailException;
 import com.voys.memo.application.StoragePort.StorageException;
 import com.voys.memo.domain.InvalidRecordingException;
+import com.voys.memo.domain.MemoNotFoundException;
 
 @RestControllerAdvice
 public class GlobalApiExceptionHandler {
@@ -48,5 +49,11 @@ public class GlobalApiExceptionHandler {
 	ResponseEntity<ApiErrorResponse> storageFailure() {
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 			.body(new ApiErrorResponse("storage.failed", "Recording could not be stored."));
+	}
+
+	@ExceptionHandler(MemoNotFoundException.class)
+	ResponseEntity<ApiErrorResponse> memoNotFound() {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+			.body(new ApiErrorResponse("memo.not_found", "Memo was not found."));
 	}
 }
