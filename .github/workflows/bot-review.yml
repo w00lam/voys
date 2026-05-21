@@ -69,6 +69,7 @@ jobs:
             const findings = [];
             const reviewFocus = [];
             const validationHints = [];
+            const fileNotes = [];
 
             if ((hasBackend || hasFrontend) && !hasAgentSpec) {
               findings.push('- 구현 파일이 변경되었지만 Agent OS spec 변경이 없습니다. 기존 spec이 이 작업을 포괄하는지 PR 본문에 명시하는 편이 좋습니다.');
@@ -116,18 +117,49 @@ jobs:
               validationHints.push('- GitHub Actions에서 `Auto PR`, `Bot Review`, `CI`가 의도대로 한 번씩만 도는지 확인');
             }
 
+            if (files.some((file) => file.filename === '.github/workflows/auto-pr.yml')) {
+              fileNotes.push('- `.github/workflows/auto-pr.yml`: PR 본문을 매 push마다 다시 쓰는 구조입니다. 사람이 PR 본문에 메모를 추가한 뒤 push하면 덮어써질 수 있으니, 수동 메모를 보존할지 정책을 정하는 게 좋습니다.');
+              fileNotes.push('- `.github/workflows/auto-pr.yml`: `compareCommitsWithBasehead` 결과를 기반으로 파일/커밋 요약을 만듭니다. 변경 파일이 30개를 넘거나 커밋이 10개를 넘는 경우 요약이 잘리는 점을 PR에 드러내는지 확인하세요.');
+            }
+
+            if (files.some((file) => file.filename === '.github/workflows/bot-review.yml')) {
+              fileNotes.push('- `.github/workflows/bot-review.yml`: 이전 자동 리뷰를 삭제한 뒤 새 코멘트를 생성합니다. marker가 브랜치명 기준이라 같은 PR에서는 중복 제거가 되지만, marker 형식 변경 시 과거 코멘트가 남을 수 있습니다.');
+              fileNotes.push('- `.github/workflows/bot-review.yml`: 리뷰 내용은 규칙 기반입니다. 실제 코드 품질 판단이 아니라 위험 신호를 알려주는 보조 리뷰라는 점이 PR에 명확히 드러납니다.');
+            }
+
+            if (files.some((file) => file.filename === '.github/workflows/start-work.yml')) {
+              fileNotes.push('- `.github/workflows/start-work.yml`: 이슈 생성 후 브랜치를 만드는 중간에 실패하면 이슈만 남을 수 있습니다. 실패 시 재실행/정리 흐름을 운영자가 이해할 수 있는지 확인하세요.');
+              fileNotes.push('- `.github/workflows/start-work.yml`: `VOYS_REVIEW_TOKEN`이 없거나 권한이 부족하면 실행이 실패합니다. repo secret 권한 요구사항이 문서화되어 있는지 확인하세요.');
+            }
+
+            if (files.some((file) => file.filename === 'agent-os/standards/git/branching.md')) {
+              fileNotes.push('- `agent-os/standards/git/branching.md`: 실제 GitHub Actions 흐름과 문서의 작업 순서가 맞는지 확인하세요. 특히 이슈 우선, draft PR, 수동 merge 원칙이 같은 방향이어야 합니다.');
+            }
+
             const changedFiles = files
               .slice(0, 30)
               .map((file) => `- \`${file.filename}\` (${file.status}, +${file.additions}/-${file.deletions})`)
               .join('\n');
 
+            const conclusion = findings.length > 0
+              ? '머지 전에 아래 확인사항을 보고 의도된 동작인지 확인하는 편이 좋겠습니다.'
+              : '현재 자동 리뷰 기준에서는 큰 차단 이슈는 보이지 않습니다. 그래도 변경 의도와 검증 결과는 사람이 최종 확인해야 합니다.';
+
             const body = [
               `<!-- voys-auto-review:${head} -->`,
               `## 리뷰: ${head}`,
               '',
+              '### 리뷰 결론',
+              '',
+              conclusion,
+              '',
               '### 발견 사항',
               '',
               findings.length > 0 ? findings.join('\n') : '- 자동 리뷰 기준에서 즉시 막아야 할 항목은 보이지 않습니다.',
+              '',
+              '### 파일별 코멘트',
+              '',
+              fileNotes.length > 0 ? fileNotes.join('\n') : '- 파일명과 변경 범위만으로 특정할 만한 파일별 코멘트는 없습니다.',
               '',
               '### 리뷰 포커스',
               '',
