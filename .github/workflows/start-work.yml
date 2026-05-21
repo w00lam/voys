@@ -71,6 +71,22 @@ jobs:
               return;
             }
 
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: type });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name: type,
+                color: '2f81f7',
+                description: `${typeLabels[type] || '작업'} 작업`,
+              });
+            }
+
             const labels = [type];
             const issueBody = bodyInput?.trim()
               ? bodyInput
@@ -139,4 +155,3 @@ jobs:
                 `이슈 URL: ${issue.data.html_url}`,
               ])
               .write();
-
