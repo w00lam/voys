@@ -8,6 +8,7 @@ import {
   type CurrentUser,
 } from './features/auth/api';
 import { getHealth, type HealthResponse } from './features/health/api';
+import { uploadRecording, type CreatedMemo } from './features/recorder/api';
 import { getErrorMessage } from './shared/api/client';
 
 type HealthState =
@@ -21,6 +22,13 @@ type AuthState =
   | { status: 'guest' }
   | { status: 'authenticated'; user: CurrentUser };
 
+type RecorderState =
+  | { status: 'idle' }
+  | { status: 'recording'; startedAt: number; elapsedSeconds: number; recorder: MediaRecorder }
+  | { status: 'uploading' }
+  | { status: 'uploaded'; memo: CreatedMemo }
+  | { status: 'failed'; message: string };
+
 function App() {
   const [health, setHealth] = useState<HealthState>({ status: 'idle' });
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
@@ -30,6 +38,7 @@ function App() {
   const [password, setPassword] = useState('');
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [recorder, setRecorder] = useState<RecorderState>({ status: 'idle' });
 
   useEffect(() => {
     let active = true;
@@ -50,6 +59,27 @@ function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (recorder.status !== 'recording') {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setRecorder((current) => {
+        if (current.status !== 'recording') {
+          return current;
+        }
+
+        return {
+          ...current,
+          elapsedSeconds: Math.floor((Date.now() - current.startedAt) / 1000),
+        };
+      });
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [recorder.status]);
 
   async function checkBackend() {
     setHealth({ status: 'loading' });
@@ -98,6 +128,57 @@ function App() {
     }
   }
 
+  async function startRecording() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setRecorder({ status: 'failed', message: 'Recording is not supported in this browser.' });
+      return;
+    }
+
+    const mimeType = 'audio/webm;codecs=opus';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      setRecorder({ status: 'failed', message: 'WebM/Opus recording is not supported in this browser.' });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const chunks: BlobPart[] = [];
+      const startedAt = Date.now();
+
+      mediaRecorder.addEventListener('dataavailable', (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      });
+
+      mediaRecorder.addEventListener('stop', async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setRecorder({ status: 'uploading' });
+
+        try {
+          const audio = new Blob(chunks, { type: mimeType });
+          const durationSeconds = Math.max(1, Math.floor((Date.now() - startedAt) / 1000));
+          const memo = await uploadRecording(audio, durationSeconds);
+          setRecorder({ status: 'uploaded', memo });
+        } catch (error) {
+          setRecorder({ status: 'failed', message: getErrorMessage(error) });
+        }
+      });
+
+      mediaRecorder.start();
+      setRecorder({ status: 'recording', startedAt, elapsedSeconds: 0, recorder: mediaRecorder });
+    } catch (error) {
+      setRecorder({ status: 'failed', message: getErrorMessage(error) });
+    }
+  }
+
+  function stopRecording() {
+    if (recorder.status === 'recording') {
+      recorder.recorder.stop();
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="workspace">
@@ -113,16 +194,45 @@ function App() {
           )}
 
           {auth.status === 'authenticated' && (
-            <div className="signed-in">
-              <div>
-                <span className="label">Signed in</span>
-                <strong>{auth.user.displayName}</strong>
-                <span className="muted">{auth.user.email}</span>
+            <>
+              <div className="signed-in">
+                <div>
+                  <span className="label">Signed in</span>
+                  <strong>{auth.user.displayName}</strong>
+                  <span className="muted">{auth.user.email}</span>
+                </div>
+                <button type="button" onClick={submitLogout} disabled={isSubmitting}>
+                  {isSubmitting ? 'Signing out...' : 'Log out'}
+                </button>
               </div>
-              <button type="button" onClick={submitLogout} disabled={isSubmitting}>
-                {isSubmitting ? 'Signing out...' : 'Log out'}
-              </button>
-            </div>
+
+              <div className="recorder-panel">
+                <div>
+                  <h2>Browser recording</h2>
+                  <p>Record WebM/Opus audio and save it as a private memo.</p>
+                </div>
+
+                {recorder.status === 'recording' ? (
+                  <button type="button" className="danger" onClick={stopRecording}>
+                    Stop {formatDuration(recorder.elapsedSeconds)}
+                  </button>
+                ) : (
+                  <button type="button" onClick={startRecording} disabled={recorder.status === 'uploading'}>
+                    {recorder.status === 'uploading' ? 'Uploading...' : 'Start recording'}
+                  </button>
+                )}
+              </div>
+
+              {recorder.status === 'uploaded' && (
+                <p className="result success">
+                  Saved {recorder.memo.title}. Transcription is {recorder.memo.transcriptionStatus.toLowerCase()}.
+                </p>
+              )}
+
+              {recorder.status === 'failed' && (
+                <p className="result failure">{recorder.message}</p>
+              )}
+            </>
           )}
 
           {auth.status === 'guest' && (
@@ -211,6 +321,12 @@ function App() {
       </section>
     </main>
   );
+}
+
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
 }
 
 export default App;

@@ -1,0 +1,97 @@
+package com.voys.memo.infrastructure.persistence;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import com.voys.identity.infrastructure.persistence.UserAccount;
+import com.voys.memo.domain.RecordingStatus;
+import com.voys.memo.domain.TranscriptionStatus;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "voice_memos")
+public class VoiceMemo {
+
+	@Id
+	@GeneratedValue
+	private UUID id;
+
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "owner_id", nullable = false)
+	private UserAccount owner;
+
+	@Column(nullable = false, length = 200)
+	private String title;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 40)
+	private RecordingStatus recordingStatus;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 40)
+	private TranscriptionStatus transcriptionStatus;
+
+	@Column(nullable = false, updatable = false)
+	private Instant createdAt;
+
+	@Column(nullable = false)
+	private Instant updatedAt;
+
+	protected VoiceMemo() {
+	}
+
+	private VoiceMemo(UserAccount owner, String title) {
+		this.owner = owner;
+		this.title = title;
+		this.recordingStatus = RecordingStatus.UPLOADED;
+		this.transcriptionStatus = TranscriptionStatus.PENDING;
+	}
+
+	public static VoiceMemo createUploaded(UserAccount owner, String title) {
+		return new VoiceMemo(owner, title);
+	}
+
+	@PrePersist
+	void prePersist() {
+		Instant now = Instant.now();
+		createdAt = now;
+		updatedAt = now;
+	}
+
+	@PreUpdate
+	void preUpdate() {
+		updatedAt = Instant.now();
+	}
+
+	public UUID getId() {
+		return id;
+	}
+
+	public String getTitle() {
+		return title;
+	}
+
+	public RecordingStatus getRecordingStatus() {
+		return recordingStatus;
+	}
+
+	public TranscriptionStatus getTranscriptionStatus() {
+		return transcriptionStatus;
+	}
+
+	public Instant getCreatedAt() {
+		return createdAt;
+	}
+}
