@@ -7,11 +7,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.voys.memo.application.StoragePort;
 import com.voys.memo.domain.MemoNotFoundException;
+import com.voys.memo.domain.TranscriptionStatus;
 import com.voys.memo.infrastructure.persistence.AudioAsset;
 import com.voys.memo.infrastructure.persistence.AudioAssetRepository;
 import com.voys.memo.infrastructure.persistence.VoiceMemo;
 import com.voys.memo.infrastructure.persistence.VoiceMemoRepository;
-import com.voys.transcription.domain.TranscriptionFailedException;
+import com.voys.transcription.domain.TranscriptionAlreadyRunningException;
 import com.voys.transcription.infrastructure.persistence.Transcript;
 import com.voys.transcription.infrastructure.persistence.TranscriptRepository;
 
@@ -23,6 +24,7 @@ public class TranscriptionWorkflowService {
 	private final TranscriptRepository transcriptRepository;
 	private final StoragePort storagePort;
 	private final TranscriptionPort transcriptionPort;
+	private final TranscriptionJobRunner transcriptionJobRunner;
 	private final TransactionTemplate transactionTemplate;
 
 	public TranscriptionWorkflowService(
@@ -31,6 +33,7 @@ public class TranscriptionWorkflowService {
 		TranscriptRepository transcriptRepository,
 		StoragePort storagePort,
 		TranscriptionPort transcriptionPort,
+		TranscriptionJobRunner transcriptionJobRunner,
 		TransactionTemplate transactionTemplate
 	) {
 		this.voiceMemoRepository = voiceMemoRepository;
@@ -38,23 +41,37 @@ public class TranscriptionWorkflowService {
 		this.transcriptRepository = transcriptRepository;
 		this.storagePort = storagePort;
 		this.transcriptionPort = transcriptionPort;
+		this.transcriptionJobRunner = transcriptionJobRunner;
 		this.transactionTemplate = transactionTemplate;
 	}
 
 	public TranscriptionResponse startTranscription(UUID ownerId, UUID memoId) {
 		AudioAsset audio = transactionTemplate.execute(status -> {
 			VoiceMemo memo = findOwnedMemo(ownerId, memoId);
+			if (memo.getTranscriptionStatus() == TranscriptionStatus.PROCESSING) {
+				throw new TranscriptionAlreadyRunningException(memoId);
+			}
 			memo.markTranscriptionProcessing();
 			return findAudio(memoId);
 		});
 
+		transcriptionJobRunner.submit(() -> runTranscriptionJob(ownerId, memoId, audio));
+
+		return transactionTemplate.execute(status -> {
+			VoiceMemo memo = findOwnedMemo(ownerId, memoId);
+			Transcript transcript = transcriptRepository.findByMemoId(memoId).orElse(null);
+			return TranscriptionResponse.from(memo, transcript);
+		});
+	}
+
+	private void runTranscriptionJob(UUID ownerId, UUID memoId, AudioAsset audio) {
 		try {
 			StoragePort.StoredResource stored = storagePort.get(audio.getStorageKey());
 			TranscriptionPort.TranscriptionResult result = transcriptionPort.transcribe(
 				new TranscriptionPort.TranscriptionRequest(memoId.toString(), stored.localPath(), null)
 			);
 
-			return transactionTemplate.execute(status -> {
+			transactionTemplate.executeWithoutResult(status -> {
 				VoiceMemo memo = findOwnedMemo(ownerId, memoId);
 				Transcript transcript = transcriptRepository.findByMemoId(memoId)
 					.map(existing -> {
@@ -64,19 +81,12 @@ public class TranscriptionWorkflowService {
 					.orElseGet(() -> Transcript.create(memo, result.text()));
 				transcriptRepository.save(transcript);
 				memo.markTranscriptionCompleted();
-				return TranscriptionResponse.from(memo, transcript);
 			});
 		} catch (RuntimeException exception) {
 			transactionTemplate.executeWithoutResult(status -> {
 				VoiceMemo memo = findOwnedMemo(ownerId, memoId);
 				memo.markTranscriptionFailed();
 			});
-
-			if (exception instanceof TranscriptionFailedException failedException) {
-				throw failedException;
-			}
-
-			throw new TranscriptionFailedException("Transcription failed.", exception);
 		}
 	}
 

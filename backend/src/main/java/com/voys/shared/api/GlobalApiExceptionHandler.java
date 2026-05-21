@@ -14,6 +14,7 @@ import com.voys.identity.domain.DuplicateEmailException;
 import com.voys.memo.application.StoragePort.StorageException;
 import com.voys.memo.domain.InvalidRecordingException;
 import com.voys.memo.domain.MemoNotFoundException;
+import com.voys.transcription.domain.TranscriptionAlreadyRunningException;
 import com.voys.transcription.domain.TranscriptionFailedException;
 
 @RestControllerAdvice
@@ -62,5 +63,11 @@ public class GlobalApiExceptionHandler {
 	ResponseEntity<ApiErrorResponse> transcriptionFailed(TranscriptionFailedException exception) {
 		return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
 			.body(new ApiErrorResponse("transcription.failed", "Transcription failed."));
+	}
+
+	@ExceptionHandler(TranscriptionAlreadyRunningException.class)
+	ResponseEntity<ApiErrorResponse> transcriptionAlreadyRunning(TranscriptionAlreadyRunningException exception) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+			.body(new ApiErrorResponse("transcription.already_running", exception.getMessage()));
 	}
 }
