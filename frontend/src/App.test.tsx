@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import App from './App';
@@ -52,7 +52,7 @@ describe('App transcription polling', () => {
     expect(screen.getByText((_, element) => element?.textContent === 'pending · 5 B')).toBeInTheDocument();
   });
 
-  test('searches memo titles and transcript snippets, then opens a selected result', async () => {
+  test('searches memo titles and transcript snippets, then opens a selected timestamp result', async () => {
     const fetchMock = mockApi();
     vi.stubGlobal('fetch', fetchMock);
 
@@ -71,6 +71,7 @@ describe('App transcription polling', () => {
     expect(screen.getByText('Strategy review')).toBeInTheDocument();
     expect(screen.getByText('TRANSCRIPT')).toBeInTheDocument();
     expect(screen.getByText('The team discussed strategy and launch risks.')).toBeInTheDocument();
+    expect(screen.getByText('00:42')).toBeInTheDocument();
 
     vi.useRealTimers();
     fireEvent.click(screen.getByRole('button', { name: /Strategy review/i }));
@@ -78,6 +79,12 @@ describe('App transcription polling', () => {
     expect(await screen.findByText('Selected memo')).toBeInTheDocument();
     expect(screen.getByText('Strategy review')).toBeInTheDocument();
     expect(screen.getByText('Transcript text for strategy review.')).toBeInTheDocument();
+
+    await waitFor(() => {
+      const audio = document.querySelector('audio');
+      expect(audio?.currentTime).toBe(42.5);
+      expect(audio?.paused).toBe(true);
+    });
   });
 });
 
@@ -179,6 +186,7 @@ function mockApi() {
           matchType: 'TRANSCRIPT',
           snippet: 'The team discussed strategy and launch risks.',
           transcriptionStatus: 'COMPLETED',
+          segmentStartSeconds: 42.5,
         },
       ]);
     }

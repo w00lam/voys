@@ -28,7 +28,8 @@ class SearchControllerTests {
 			"Product strategy sync",
 			"TITLE",
 			"Product strategy sync",
-			"COMPLETED"
+			"COMPLETED",
+			null
 		);
 		when(searchService.search(ownerId, "strategy")).thenReturn(List.of(result));
 

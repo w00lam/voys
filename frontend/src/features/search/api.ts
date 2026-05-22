@@ -6,6 +6,7 @@ export type SearchResult = {
   matchType: 'TITLE' | 'TRANSCRIPT';
   snippet: string;
   transcriptionStatus: string;
+  segmentStartSeconds: number | null;
 };
 
 export function searchMemos(query: string): Promise<SearchResult[]> {

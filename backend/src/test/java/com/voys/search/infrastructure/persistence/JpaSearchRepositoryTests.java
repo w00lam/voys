@@ -11,6 +11,7 @@ import com.voys.identity.infrastructure.persistence.UserAccount;
 import com.voys.memo.infrastructure.persistence.VoiceMemo;
 import com.voys.search.application.SearchResult;
 import com.voys.transcription.infrastructure.persistence.Transcript;
+import com.voys.transcription.infrastructure.persistence.TranscriptSegment;
 
 import jakarta.persistence.EntityManager;
 
@@ -32,7 +33,13 @@ class JpaSearchRepositoryTests {
 		UserAccount owner = user("owner@example.com", "Owner");
 		UserAccount otherOwner = user("other@example.com", "Other Owner");
 		VoiceMemo titleMatch = completedMemo(owner, "Product strategy sync", "No keyword here.");
-		VoiceMemo transcriptMatch = completedMemo(owner, "Lecture memo", "We discussed strategy and launch risks.");
+		VoiceMemo transcriptMatch = completedMemoWithSegments(
+			owner,
+			"Lecture memo",
+			"We discussed strategy and launch risks.",
+			segment(0, 0.0, 3.5, "Opening context"),
+			segment(1, 42.5, 48.0, "strategy and launch risks")
+		);
 		completedMemo(otherOwner, "Other strategy memo", "Other user's strategy transcript.");
 		pendingMemo(owner, "Draft memo", "strategy should not match until completed");
 		entityManager.flush();
@@ -48,7 +55,17 @@ class JpaSearchRepositoryTests {
 			.containsExactlyInAnyOrder("TITLE", "TRANSCRIPT");
 		assertThat(results)
 			.extracting(SearchResult::snippet)
-			.contains("Product strategy sync", "We discussed strategy and launch risks.");
+			.contains("Product strategy sync", "strategy and launch risks");
+		SearchResult transcriptResult = results.stream()
+			.filter(result -> result.memoId().equals(transcriptMatch.getId().toString()))
+			.findFirst()
+			.orElseThrow();
+		assertThat(transcriptResult.segmentStartSeconds()).isEqualTo(42.5);
+		SearchResult titleResult = results.stream()
+			.filter(result -> result.memoId().equals(titleMatch.getId().toString()))
+			.findFirst()
+			.orElseThrow();
+		assertThat(titleResult.segmentStartSeconds()).isNull();
 	}
 
 	@Test
@@ -70,6 +87,29 @@ class JpaSearchRepositoryTests {
 		return memo;
 	}
 
+	private VoiceMemo completedMemoWithSegments(
+		UserAccount owner,
+		String title,
+		String transcriptText,
+		SegmentFixture... segments
+	) {
+		VoiceMemo memo = VoiceMemo.createUploaded(owner, title);
+		memo.markTranscriptionCompleted();
+		entityManager.persist(memo);
+		Transcript transcript = Transcript.create(memo, transcriptText);
+		entityManager.persist(transcript);
+		for (SegmentFixture segment : segments) {
+			entityManager.persist(TranscriptSegment.create(
+				transcript,
+				segment.position(),
+				segment.startSeconds(),
+				segment.endSeconds(),
+				segment.text()
+			));
+		}
+		return memo;
+	}
+
 	private VoiceMemo pendingMemo(UserAccount owner, String title, String transcriptText) {
 		VoiceMemo memo = VoiceMemo.createUploaded(owner, title);
 		entityManager.persist(memo);
@@ -82,4 +122,15 @@ class JpaSearchRepositoryTests {
 		entityManager.persist(user);
 		return user;
 	}
+
+	private SegmentFixture segment(int position, double startSeconds, double endSeconds, String text) {
+		return new SegmentFixture(position, startSeconds, endSeconds, text);
+	}
+
+	private record SegmentFixture(
+		int position,
+		double startSeconds,
+		double endSeconds,
+		String text
+	) {}
 }
