@@ -88,6 +88,35 @@ describe('App transcription polling', () => {
     });
   });
 
+  test('renders transcript segments and seeks audio when a segment is clicked', async () => {
+    vi.stubGlobal('fetch', mockApi());
+
+    render(<App />);
+
+    const searchInput = await screen.findByRole('textbox', { name: /Search recordings/i });
+
+    vi.useFakeTimers();
+    fireEvent.change(searchInput, { target: { value: 'strategy' } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    vi.useRealTimers();
+    fireEvent.click(screen.getByRole('button', { name: /Strategy review/i }));
+
+    expect(await screen.findByRole('button', { name: /00:42 strategy and launch risks/i })).toBeInTheDocument();
+
+    const audio = document.querySelector('audio');
+    expect(audio).not.toBeNull();
+    audio!.currentTime = 0;
+
+    fireEvent.click(screen.getByRole('button', { name: /00:42 strategy and launch risks/i }));
+
+    expect(audio?.currentTime).toBe(42.5);
+    expect(audio?.paused).toBe(true);
+  });
+
   test('automatically stops browser recording at the two hour limit', async () => {
     const fetchMock = mockApi();
     vi.stubGlobal('fetch', fetchMock);
@@ -254,6 +283,27 @@ function mockApi() {
         memoId,
         status: memoStatus,
         text: selectedTitle === 'Strategy review' ? 'Transcript text for strategy review.' : null,
+        segments: selectedTitle === 'Strategy review' ? [
+          {
+            position: 0,
+            startSeconds: 42.5,
+            endSeconds: 48.0,
+            text: 'strategy and launch risks',
+          },
+        ] : [
+          {
+            position: 0,
+            startSeconds: 0.0,
+            endSeconds: 4.2,
+            text: 'intro',
+          },
+          {
+            position: 1,
+            startSeconds: 4.2,
+            endSeconds: 8.0,
+            text: 'roadmap and risks',
+          },
+        ],
         updatedAt: null,
       });
     }

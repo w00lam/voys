@@ -596,6 +596,26 @@ function App() {
                         <pre>{transcript.transcript.text}</pre>
                       )}
 
+                      {transcript.status === 'ready' && transcript.transcript.segments && transcript.transcript.segments.length > 0 && (
+                        <div className="transcript-segments">
+                          {transcript.transcript.segments.map((segment) => (
+                            <button
+                              key={segment.position}
+                              type="button"
+                              onClick={() => {
+                                if (audioRef.current) {
+                                  audioRef.current.currentTime = segment.startSeconds;
+                                }
+                              }}
+                              className="segment-btn"
+                            >
+                              <span className="segment-timestamp">{formatTimestamp(segment.startSeconds)}</span>{' '}
+                              <span className="segment-text">{segment.text}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       {transcript.status === 'ready' && transcript.transcript.status === 'FAILED' && (
                         <p className="result failure">Transcription failed.</p>
                       )}
