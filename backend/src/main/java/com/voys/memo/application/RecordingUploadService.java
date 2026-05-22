@@ -18,6 +18,8 @@ import com.voys.memo.infrastructure.persistence.VoiceMemoRepository;
 @Service
 public class RecordingUploadService {
 
+	private static final int MAX_DURATION_SECONDS = 7_200;
+
 	private final UserAccountRepository userAccountRepository;
 	private final VoiceMemoRepository voiceMemoRepository;
 	private final AudioAssetRepository audioAssetRepository;
@@ -79,6 +81,15 @@ public class RecordingUploadService {
 		String contentType = command.contentType();
 		if (contentType == null || !contentType.toLowerCase().startsWith("audio/webm")) {
 			throw new InvalidRecordingException("Only WebM audio recordings are supported.");
+		}
+
+		if (command.durationSeconds() != null) {
+			if (command.durationSeconds() <= 0) {
+				throw new InvalidRecordingException("Recording duration must be positive.");
+			}
+			if (command.durationSeconds() > MAX_DURATION_SECONDS) {
+				throw new InvalidRecordingException("Recording duration cannot exceed 2 hours.");
+			}
 		}
 	}
 
