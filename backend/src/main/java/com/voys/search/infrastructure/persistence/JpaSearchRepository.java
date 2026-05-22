@@ -1,5 +1,8 @@
 package com.voys.search.infrastructure.persistence;
 
+import java.nio.ByteBuffer;
+import java.sql.Clob;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.UUID;
 
@@ -53,11 +56,36 @@ public class JpaSearchRepository implements SearchRepository {
 			.getResultList();
 
 		return rows.stream().map(row -> new SearchResult(
-			row[0].toString(),
-			(String) row[1],
-			(String) row[2],
-			(String) row[3],
-			(String) row[4]
+			asUuidString(row[0]),
+			asString(row[1]),
+			asString(row[2]),
+			asString(row[3]),
+			asString(row[4])
 		)).toList();
+	}
+
+	private String asUuidString(Object value) {
+		if (value instanceof UUID uuid) {
+			return uuid.toString();
+		}
+		if (value instanceof byte[] bytes) {
+			ByteBuffer buffer = ByteBuffer.wrap(bytes);
+			return new UUID(buffer.getLong(), buffer.getLong()).toString();
+		}
+		return value.toString();
+	}
+
+	private String asString(Object value) {
+		if (value == null) {
+			return null;
+		}
+		if (value instanceof Clob clob) {
+			try {
+				return clob.getSubString(1, Math.toIntExact(clob.length()));
+			} catch (SQLException exception) {
+				throw new IllegalStateException("Could not read search result text.", exception);
+			}
+		}
+		return value.toString();
 	}
 }
