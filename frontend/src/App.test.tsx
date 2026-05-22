@@ -25,20 +25,20 @@ describe('App transcription polling', () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
-    await screen.findByText('No transcript has been created yet.');
+    await screen.findByText('아직 생성된 전사 내용이 없습니다.');
 
     vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: /Start transcription/i }));
+    fireEvent.click(screen.getByRole('button', { name: /전사 시작/i }));
 
     await act(async () => {});
-    expect(screen.getAllByText(/processing/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/처리 중/i).length).toBeGreaterThan(0);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(6_000);
     });
 
     expect(screen.getByText('Final transcript text from the background worker.')).toBeInTheDocument();
-    expect(screen.getAllByText(/completed/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/완료/i).length).toBeGreaterThan(0);
     expect(transcriptFetchCount(fetchMock)).toBeGreaterThanOrEqual(3);
   });
 
@@ -50,7 +50,7 @@ describe('App transcription polling', () => {
     await screen.findByRole('button', { name: /Lecture about product strategy/i });
 
     expect(screen.queryByText(/쨌|夷|�/)).not.toBeInTheDocument();
-    expect(screen.getByText((_, element) => element?.textContent === 'pending · 5 B')).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.textContent === '대기 중 · 5 B')).toBeInTheDocument();
   });
 
   test('searches memo titles and transcript snippets, then opens a selected timestamp result', async () => {
@@ -59,7 +59,7 @@ describe('App transcription polling', () => {
 
     render(<App />);
 
-    const searchInput = await screen.findByRole('textbox', { name: /Search recordings/i });
+    const searchInput = await screen.findByRole('textbox', { name: /녹음 검색/i });
 
     vi.useFakeTimers();
     fireEvent.change(searchInput, { target: { value: 'strategy' } });
@@ -70,14 +70,14 @@ describe('App transcription polling', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('/api/search?q=strategy', { credentials: 'include' });
     expect(screen.getByText('Strategy review')).toBeInTheDocument();
-    expect(screen.getByText('TRANSCRIPT')).toBeInTheDocument();
+    expect(screen.getByText('전사')).toBeInTheDocument();
     expect(screen.getByText('The team discussed strategy and launch risks.')).toBeInTheDocument();
     expect(screen.getByText('00:42')).toBeInTheDocument();
 
     vi.useRealTimers();
     fireEvent.click(screen.getByRole('button', { name: /Strategy review/i }));
 
-    expect(await screen.findByText('Selected memo')).toBeInTheDocument();
+    expect(await screen.findByText('선택한 메모')).toBeInTheDocument();
     expect(screen.getByText('Strategy review')).toBeInTheDocument();
     expect(screen.getByText('Transcript text for strategy review.')).toBeInTheDocument();
 
@@ -93,7 +93,7 @@ describe('App transcription polling', () => {
 
     render(<App />);
 
-    const searchInput = await screen.findByRole('textbox', { name: /Search recordings/i });
+    const searchInput = await screen.findByRole('textbox', { name: /녹음 검색/i });
 
     vi.useFakeTimers();
     fireEvent.change(searchInput, { target: { value: 'strategy' } });
@@ -125,8 +125,8 @@ describe('App transcription polling', () => {
 
     render(<App />);
 
-    const startButton = await screen.findByRole('button', { name: /Start recording/i });
-    expect(screen.getByText(/Max 2 hours/i)).toBeInTheDocument();
+    const startButton = await screen.findByRole('button', { name: /녹음 시작/i });
+    expect(screen.getByText(/최대 2시간/i)).toBeInTheDocument();
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-22T10:00:00Z'));
