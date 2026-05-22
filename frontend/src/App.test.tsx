@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import App from './App';
 
 const memoId = '33333333-3333-3333-3333-333333333333';
+const maxRecordingDurationMs = 7_200_000;
 
 describe('App transcription polling', () => {
   beforeEach(() => {
@@ -86,7 +87,76 @@ describe('App transcription polling', () => {
       expect(audio?.paused).toBe(true);
     });
   });
+
+  test('automatically stops browser recording at the two hour limit', async () => {
+    const fetchMock = mockApi();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const recorder = installMediaRecorderMock();
+
+    render(<App />);
+
+    const startButton = await screen.findByRole('button', { name: /Start recording/i });
+    expect(screen.getByText(/Max 2 hours/i)).toBeInTheDocument();
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-22T10:00:00Z'));
+    fireEvent.click(startButton);
+
+    await act(async () => {});
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(maxRecordingDurationMs);
+    });
+
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/memos/recordings',
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+  });
 });
+
+function installMediaRecorderMock() {
+  const stream = {
+    getTracks: () => [{ stop: vi.fn() }],
+  };
+  vi.stubGlobal('navigator', {
+    mediaDevices: {
+      getUserMedia: vi.fn(async () => stream),
+    },
+  });
+
+  const recorder = {
+    start: vi.fn(),
+    stop: vi.fn(),
+    addEventListener: vi.fn(),
+  };
+
+  const listeners = new Map<string, Array<(event?: unknown) => void>>();
+  recorder.addEventListener.mockImplementation((eventName: string, listener: (event?: unknown) => void) => {
+    listeners.set(eventName, [...(listeners.get(eventName) ?? []), listener]);
+  });
+  recorder.stop.mockImplementation(() => {
+    for (const listener of listeners.get('dataavailable') ?? []) {
+      listener({ data: new Blob(['audio'], { type: 'audio/webm' }) });
+    }
+    for (const listener of listeners.get('stop') ?? []) {
+      listener();
+    }
+  });
+
+  const MediaRecorderMock = vi.fn(() => recorder);
+  Object.assign(MediaRecorderMock, {
+    isTypeSupported: vi.fn(() => true),
+  });
+  vi.stubGlobal('MediaRecorder', MediaRecorderMock);
+
+  return recorder;
+}
 
 function mockApi() {
   let transcriptReads = 0;
@@ -154,6 +224,16 @@ function mockApi() {
         text: null,
         updatedAt: null,
       });
+    }
+
+    if (method === 'POST' && path === '/api/memos/recordings') {
+      return jsonResponse({
+        id: memoId,
+        title: 'Recording 2026-05-22 19:00',
+        recordingStatus: 'UPLOADED',
+        transcriptionStatus: 'PENDING',
+        createdAt: '2026-05-22T10:00:00Z',
+      }, 201);
     }
 
     if (method === 'GET' && path === `/api/memos/${memoId}/transcript`) {
