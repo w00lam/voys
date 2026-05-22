@@ -64,6 +64,9 @@ type SearchState =
   | { status: 'ready'; results: SearchResult[] }
   | { status: 'failed'; message: string };
 
+const MAX_RECORDING_DURATION_SECONDS = 7_200;
+const RECORDING_TIMER_INTERVAL_MS = 1_000;
+
 function App() {
   const [health, setHealth] = useState<HealthState>({ status: 'idle' });
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
@@ -81,6 +84,7 @@ function App() {
   const [search, setSearch] = useState<SearchState>({ status: 'idle' });
   const [pendingSeek, setPendingSeek] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isStoppingRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -138,10 +142,19 @@ function App() {
           elapsedSeconds: Math.floor((Date.now() - current.startedAt) / 1000),
         };
       });
-    }, 1000);
+    }, RECORDING_TIMER_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
   }, [recorder.status]);
+
+  useEffect(() => {
+    if (recorder.status === 'recording' && recorder.elapsedSeconds >= MAX_RECORDING_DURATION_SECONDS) {
+      if (!isStoppingRef.current) {
+        isStoppingRef.current = true;
+        recorder.recorder.stop();
+      }
+    }
+  }, [recorder]);
 
   useEffect(() => {
     if (playback.status !== 'ready' || transcript.status !== 'ready') {
@@ -306,6 +319,7 @@ function App() {
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       const chunks: BlobPart[] = [];
       const startedAt = Date.now();
+      isStoppingRef.current = false;
 
       mediaRecorder.addEventListener('dataavailable', (event) => {
         if (event.data.size > 0) {
@@ -314,6 +328,7 @@ function App() {
       });
 
       mediaRecorder.addEventListener('stop', async () => {
+        isStoppingRef.current = true;
         stream.getTracks().forEach((track) => track.stop());
         setRecorder({ status: 'uploading' });
 
@@ -336,7 +351,8 @@ function App() {
   }
 
   function stopRecording() {
-    if (recorder.status === 'recording') {
+    if (recorder.status === 'recording' && !isStoppingRef.current) {
+      isStoppingRef.current = true;
       recorder.recorder.stop();
     }
   }
@@ -423,7 +439,7 @@ function App() {
               <div className="recorder-panel">
                 <div>
                   <h2>Browser recording</h2>
-                  <p>Record WebM/Opus audio and save it as a private memo.</p>
+                  <p>Record WebM/Opus audio and save it as a private memo. (Max 2 hours)</p>
                 </div>
 
                 {recorder.status === 'recording' ? (

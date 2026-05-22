@@ -111,6 +111,8 @@ describe('App transcription polling', () => {
 
     expect(recorder.stop).toHaveBeenCalledTimes(1);
 
+    vi.useRealTimers();
+
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/memos/recordings',
@@ -149,7 +151,7 @@ function installMediaRecorderMock() {
     }
   });
 
-  const MediaRecorderMock = vi.fn(() => recorder);
+  const MediaRecorderMock = vi.fn(function() { return recorder; });
   Object.assign(MediaRecorderMock, {
     isTypeSupported: vi.fn(() => true),
   });
