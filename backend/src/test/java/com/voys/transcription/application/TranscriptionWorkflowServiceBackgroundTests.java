@@ -36,6 +36,7 @@ import com.voys.transcription.domain.TranscriptionAlreadyRunningException;
 import com.voys.transcription.domain.TranscriptionFailedException;
 import com.voys.transcription.infrastructure.persistence.Transcript;
 import com.voys.transcription.infrastructure.persistence.TranscriptRepository;
+import com.voys.transcription.infrastructure.persistence.TranscriptSegmentRepository;
 
 class TranscriptionWorkflowServiceBackgroundTests {
 
@@ -46,6 +47,7 @@ class TranscriptionWorkflowServiceBackgroundTests {
 	private final VoiceMemoRepository voiceMemoRepository = mock(VoiceMemoRepository.class);
 	private final AudioAssetRepository audioAssetRepository = mock(AudioAssetRepository.class);
 	private final TranscriptRepository transcriptRepository = mock(TranscriptRepository.class);
+	private final TranscriptSegmentRepository transcriptSegmentRepository = mock(TranscriptSegmentRepository.class);
 	private final StoragePort storagePort = mock(StoragePort.class);
 	private final FakeTranscriptionPort transcriptionPort = new FakeTranscriptionPort();
 	private final RecordingTranscriptionJobRunner jobRunner = new RecordingTranscriptionJobRunner();
@@ -74,6 +76,7 @@ class TranscriptionWorkflowServiceBackgroundTests {
 			voiceMemoRepository,
 			audioAssetRepository,
 			transcriptRepository,
+			transcriptSegmentRepository,
 			storagePort,
 			transcriptionPort,
 			jobRunner,
