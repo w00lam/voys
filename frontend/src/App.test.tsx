@@ -72,6 +72,7 @@ describe('App transcription polling', () => {
     expect(screen.getByText('TRANSCRIPT')).toBeInTheDocument();
     expect(screen.getByText('The team discussed strategy and launch risks.')).toBeInTheDocument();
 
+    vi.useRealTimers();
     fireEvent.click(screen.getByRole('button', { name: /Strategy review/i }));
 
     expect(await screen.findByText('Selected memo')).toBeInTheDocument();
