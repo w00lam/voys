@@ -12,7 +12,7 @@ Useful starting points:
 - `agent-os/product/mission.md` - product mission placeholder
 - `agent-os/product/roadmap.md` - product roadmap placeholder
 - `agent-os/product/tech-stack.md` - technical stack placeholder
-- `.claude/commands/agent-os/` - Agent OS command definitions
+- `agent-os/product/mvp-verification.md` - MVP manual verification checklist
 
 ## WSL Setup
 
