@@ -5,5 +5,6 @@ public record SearchResult(
 	String title,
 	String matchType,
 	String snippet,
-	String transcriptionStatus
+	String transcriptionStatus,
+	Double segmentStartSeconds
 ) {}

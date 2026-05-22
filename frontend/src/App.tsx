@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import './App.css';
 import {
   getCurrentUser,
@@ -79,6 +79,8 @@ function App() {
   const [transcript, setTranscript] = useState<TranscriptState>({ status: 'idle' });
   const [searchQuery, setSearchQuery] = useState('');
   const [search, setSearch] = useState<SearchState>({ status: 'idle' });
+  const [pendingSeek, setPendingSeek] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -224,6 +226,16 @@ function App() {
     };
   }, [searchQuery]);
 
+  useEffect(() => {
+    if (playback.status === 'ready' && pendingSeek !== null) {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = pendingSeek;
+        setPendingSeek(null);
+      }
+    }
+  }, [playback.status, pendingSeek]);
+
   async function checkBackend() {
     setHealth({ status: 'loading' });
 
@@ -340,8 +352,9 @@ function App() {
     }
   }
 
-  async function selectMemo(memoId: string) {
+  async function selectMemo(memoId: string, seekSeconds: number | null = null) {
     setSearchQuery('');
+    setPendingSeek(seekSeconds);
     if (playback.status === 'ready') {
       URL.revokeObjectURL(playback.audioUrl);
     }
@@ -469,11 +482,14 @@ function App() {
                           <li key={`${result.memoId}-${result.matchType}-${result.snippet}`}>
                             <button
                               type="button"
-                              onClick={() => selectMemo(result.memoId)}
+                              onClick={() => selectMemo(result.memoId, result.segmentStartSeconds)}
                               className="search-result-btn"
                             >
                               <div className="search-result-header">
                                 <span className="search-result-title">{result.title}</span>
+                                {result.segmentStartSeconds != null && (
+                                  <span className="search-result-timestamp">{formatTimestamp(result.segmentStartSeconds)}</span>
+                                )}
                                 <span className="badge-match-type">{result.matchType}</span>
                               </div>
                               <p className="search-result-snippet">{result.snippet}</p>
@@ -536,7 +552,7 @@ function App() {
                         {new Date(playback.memo.createdAt).toLocaleString()}
                       </span>
                     </div>
-                    <audio controls src={playback.audioUrl}>
+                    <audio ref={audioRef} controls src={playback.audioUrl}>
                       <track kind="captions" />
                     </audio>
                     <div className="transcript-panel">
@@ -680,6 +696,13 @@ function formatDuration(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
   const seconds = (totalSeconds % 60).toString().padStart(2, '0');
   return `${minutes}:${seconds}`;
+}
+
+function formatTimestamp(seconds: number): string {
+  const totalSeconds = Math.floor(seconds);
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const secs = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${secs}`;
 }
 
 function formatBytes(bytes: number): string {
