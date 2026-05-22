@@ -48,14 +48,43 @@ describe('App transcription polling', () => {
 
     await screen.findByRole('button', { name: /Lecture about product strategy/i });
 
-    expect(screen.queryByText(/쨌/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/쨌|夷|�/)).not.toBeInTheDocument();
     expect(screen.getByText((_, element) => element?.textContent === 'pending · 5 B')).toBeInTheDocument();
+  });
+
+  test('searches memo titles and transcript snippets, then opens a selected result', async () => {
+    const fetchMock = mockApi();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    const searchInput = await screen.findByRole('textbox', { name: /Search recordings/i });
+
+    vi.useFakeTimers();
+    fireEvent.change(searchInput, { target: { value: 'strategy' } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/search?q=strategy', { credentials: 'include' });
+    expect(screen.getByText('Strategy review')).toBeInTheDocument();
+    expect(screen.getByText('TRANSCRIPT')).toBeInTheDocument();
+    expect(screen.getByText('The team discussed strategy and launch risks.')).toBeInTheDocument();
+
+    vi.useRealTimers();
+    fireEvent.click(screen.getByRole('button', { name: /Strategy review/i }));
+
+    expect(await screen.findByText('Selected memo')).toBeInTheDocument();
+    expect(screen.getByText('Strategy review')).toBeInTheDocument();
+    expect(screen.getByText('Transcript text for strategy review.')).toBeInTheDocument();
   });
 });
 
 function mockApi() {
   let transcriptReads = 0;
   let memoStatus = 'PENDING';
+  let selectedTitle = 'Lecture about product strategy';
 
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = typeof input === 'string' ? input : input.toString();
@@ -73,7 +102,7 @@ function mockApi() {
       return jsonResponse([
         {
           id: memoId,
-          title: 'Lecture about product strategy',
+          title: selectedTitle,
           recordingStatus: 'UPLOADED',
           transcriptionStatus: memoStatus,
           createdAt: '2026-05-21T10:00:00Z',
@@ -86,7 +115,7 @@ function mockApi() {
     if (method === 'GET' && path === `/api/memos/${memoId}`) {
       return jsonResponse({
         id: memoId,
-        title: 'Lecture about product strategy',
+        title: selectedTitle,
         recordingStatus: 'UPLOADED',
         transcriptionStatus: memoStatus,
         createdAt: '2026-05-21T10:00:00Z',
@@ -122,7 +151,7 @@ function mockApi() {
 
     if (method === 'GET' && path === `/api/memos/${memoId}/transcript`) {
       transcriptReads += 1;
-      if (transcriptReads >= 3) {
+      if (transcriptReads >= 3 && selectedTitle !== 'Strategy review') {
         memoStatus = 'COMPLETED';
         return jsonResponse({
           memoId,
@@ -135,9 +164,23 @@ function mockApi() {
       return jsonResponse({
         memoId,
         status: memoStatus,
-        text: null,
+        text: selectedTitle === 'Strategy review' ? 'Transcript text for strategy review.' : null,
         updatedAt: null,
       });
+    }
+
+    if (method === 'GET' && path === '/api/search?q=strategy') {
+      selectedTitle = 'Strategy review';
+      memoStatus = 'COMPLETED';
+      return jsonResponse([
+        {
+          memoId,
+          title: 'Strategy review',
+          matchType: 'TRANSCRIPT',
+          snippet: 'The team discussed strategy and launch risks.',
+          transcriptionStatus: 'COMPLETED',
+        },
+      ]);
     }
 
     return jsonResponse({ code: 'test.not_found', message: `${method} ${path}` }, 404);

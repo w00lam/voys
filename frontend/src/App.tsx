@@ -20,6 +20,7 @@ import {
 } from './features/memos/api';
 import { uploadRecording, type CreatedMemo } from './features/recorder/api';
 import { getErrorMessage } from './shared/api/client';
+import { searchMemos, type SearchResult } from './features/search/api';
 
 type HealthState =
   | { status: 'idle' }
@@ -57,6 +58,12 @@ type TranscriptState =
   | { status: 'ready'; transcript: TranscriptResponse }
   | { status: 'failed'; message: string };
 
+type SearchState =
+  | { status: 'idle' }
+  | { status: 'searching' }
+  | { status: 'ready'; results: SearchResult[] }
+  | { status: 'failed'; message: string };
+
 function App() {
   const [health, setHealth] = useState<HealthState>({ status: 'idle' });
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
@@ -70,6 +77,8 @@ function App() {
   const [memoState, setMemoState] = useState<MemoState>({ status: 'idle' });
   const [playback, setPlayback] = useState<PlaybackState>({ status: 'idle' });
   const [transcript, setTranscript] = useState<TranscriptState>({ status: 'idle' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [search, setSearch] = useState<SearchState>({ status: 'idle' });
 
   useEffect(() => {
     let active = true;
@@ -98,6 +107,8 @@ function App() {
       setMemoState({ status: 'idle' });
       setPlayback({ status: 'idle' });
       setTranscript({ status: 'idle' });
+      setSearchQuery('');
+      setSearch({ status: 'idle' });
     }
   }, [auth.status]);
 
@@ -185,6 +196,34 @@ function App() {
     transcript.status === 'ready' ? transcript.transcript.status : null,
   ]);
 
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearch({ status: 'idle' });
+      return undefined;
+    }
+
+    let active = true;
+    const timerId = window.setTimeout(async () => {
+      try {
+        setSearch({ status: 'searching' });
+        const results = await searchMemos(trimmed);
+        if (active) {
+          setSearch({ status: 'ready', results });
+        }
+      } catch (error) {
+        if (active) {
+          setSearch({ status: 'failed', message: getErrorMessage(error) });
+        }
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timerId);
+    };
+  }, [searchQuery]);
+
   async function checkBackend() {
     setHealth({ status: 'loading' });
 
@@ -228,6 +267,8 @@ function App() {
       setMemoState({ status: 'idle' });
       setPlayback({ status: 'idle' });
       setTranscript({ status: 'idle' });
+      setSearchQuery('');
+      setSearch({ status: 'idle' });
       setAuthMessage('Logged out.');
     } catch (error) {
       setAuthMessage(getErrorMessage(error));
@@ -300,6 +341,7 @@ function App() {
   }
 
   async function selectMemo(memoId: string) {
+    setSearchQuery('');
     if (playback.status === 'ready') {
       URL.revokeObjectURL(playback.audioUrl);
     }
@@ -391,6 +433,61 @@ function App() {
               {recorder.status === 'failed' && (
                 <p className="result failure">{recorder.message}</p>
               )}
+
+              <div className="search-panel">
+                <h2>Search</h2>
+                <div className="search-input-wrapper">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search titles and transcripts..."
+                    aria-label="Search recordings"
+                    className="search-input"
+                  />
+                </div>
+
+                {searchQuery.trim() === '' && (
+                  <p className="search-guide muted">Enter a search term to find memos.</p>
+                )}
+
+                {searchQuery.trim() !== '' && search.status === 'searching' && (
+                  <p className="muted">Searching...</p>
+                )}
+
+                {search.status === 'failed' && (
+                  <p className="result failure">{search.message}</p>
+                )}
+
+                {search.status === 'ready' && searchQuery.trim() !== '' && (
+                  <div className="search-results">
+                    {search.results.length === 0 ? (
+                      <p className="muted">No results found.</p>
+                    ) : (
+                      <ul className="search-results-list">
+                        {search.results.map((result) => (
+                          <li key={`${result.memoId}-${result.matchType}-${result.snippet}`}>
+                            <button
+                              type="button"
+                              onClick={() => selectMemo(result.memoId)}
+                              className="search-result-btn"
+                            >
+                              <div className="search-result-header">
+                                <span className="search-result-title">{result.title}</span>
+                                <span className="badge-match-type">{result.matchType}</span>
+                              </div>
+                              <p className="search-result-snippet">{result.snippet}</p>
+                              <small className="search-result-status">
+                                Status: {result.transcriptionStatus.toLowerCase()}
+                              </small>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="library-panel">
                 <div className="library-heading">
