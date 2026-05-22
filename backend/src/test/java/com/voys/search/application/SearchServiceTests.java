@@ -24,8 +24,8 @@ class SearchServiceTests {
 	@Test
 	void searchNormalizesQueryAndReturnsTitleAndTranscriptMatchesForOwner() {
 		when(searchRepository.search(ownerId, "strategy", 20)).thenReturn(List.of(
-			new SearchResult(memoId.toString(), "Product strategy sync", "TITLE", "Product strategy sync", "COMPLETED"),
-			new SearchResult(memoId.toString(), "Lecture memo", "TRANSCRIPT", "We discussed strategy and roadmap.", "COMPLETED")
+			new SearchResult(memoId.toString(), "Product strategy sync", "TITLE", "Product strategy sync", "COMPLETED", null),
+			new SearchResult(memoId.toString(), "Lecture memo", "TRANSCRIPT", "strategy and roadmap", "COMPLETED", 42.5)
 		));
 
 		List<SearchResult> results = searchService.search(ownerId, "  Strategy  ");
@@ -34,7 +34,9 @@ class SearchServiceTests {
 		assertThat(results).extracting(SearchResult::matchType)
 			.containsExactly("TITLE", "TRANSCRIPT");
 		assertThat(results).extracting(SearchResult::snippet)
-			.containsExactly("Product strategy sync", "We discussed strategy and roadmap.");
+			.containsExactly("Product strategy sync", "strategy and roadmap");
+		assertThat(results).extracting(SearchResult::segmentStartSeconds)
+			.containsExactly(null, 42.5);
 		verify(searchRepository).search(ownerId, "strategy", 20);
 	}
 
