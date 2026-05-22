@@ -274,7 +274,7 @@ function App() {
       setAuth({ status: 'authenticated', user });
       await refreshMemos();
       setPassword('');
-      setAuthMessage(mode === 'signup' ? 'Account created.' : 'Logged in.');
+      setAuthMessage(mode === 'signup' ? '계정이 생성되었습니다.' : '로그인되었습니다.');
     } catch (error) {
       setAuthMessage(getErrorMessage(error));
     } finally {
@@ -294,7 +294,7 @@ function App() {
       setTranscript({ status: 'idle' });
       setSearchQuery('');
       setSearch({ status: 'idle' });
-      setAuthMessage('Logged out.');
+      setAuthMessage('로그아웃되었습니다.');
     } catch (error) {
       setAuthMessage(getErrorMessage(error));
     } finally {
@@ -304,13 +304,13 @@ function App() {
 
   async function startRecording() {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setRecorder({ status: 'failed', message: 'Recording is not supported in this browser.' });
+      setRecorder({ status: 'failed', message: '이 브라우저에서는 녹음을 지원하지 않습니다.' });
       return;
     }
 
     const mimeType = 'audio/webm;codecs=opus';
     if (!MediaRecorder.isTypeSupported(mimeType)) {
-      setRecorder({ status: 'failed', message: 'WebM/Opus recording is not supported in this browser.' });
+      setRecorder({ status: 'failed', message: '이 브라우저에서는 WebM/Opus 녹음을 지원하지 않습니다.' });
       return;
     }
 
@@ -412,50 +412,50 @@ function App() {
   return (
     <main className="app-shell">
       <section className="workspace">
-        <div className="eyebrow">Voys workspace</div>
-        <h1>Record, transcribe, and search long voice notes.</h1>
+        <div className="eyebrow">Voys 워크스페이스</div>
+        <h1>긴 음성 기록을 녹음하고, 문서화하고, 다시 찾아보세요.</h1>
         <p className="intro">
-          Sign in to keep recordings and transcripts separated by account.
+          회의, 강의, 인터뷰 녹음을 계정별로 안전하게 보관하고 필요한 순간을 검색할 수 있습니다.
         </p>
 
         <div className="auth-panel">
           {auth.status === 'loading' && (
-            <p className="muted">Checking session...</p>
+            <p className="muted">로그인 상태를 확인하고 있습니다...</p>
           )}
 
           {auth.status === 'authenticated' && (
             <>
               <div className="signed-in">
                 <div>
-                  <span className="label">Signed in</span>
+                  <span className="label">로그인됨</span>
                   <strong>{auth.user.displayName}</strong>
                   <span className="muted">{auth.user.email}</span>
                 </div>
                 <button type="button" onClick={submitLogout} disabled={isSubmitting}>
-                  {isSubmitting ? 'Signing out...' : 'Log out'}
+                  {isSubmitting ? '로그아웃 중...' : '로그아웃'}
                 </button>
               </div>
 
               <div className="recorder-panel">
                 <div>
-                  <h2>Browser recording</h2>
-                  <p>Record WebM/Opus audio and save it as a private memo. (Max 2 hours)</p>
+                  <h2>브라우저 녹음</h2>
+                  <p>WebM/Opus 음성을 녹음해 개인 메모로 저장합니다. 최대 2시간까지 녹음할 수 있습니다.</p>
                 </div>
 
                 {recorder.status === 'recording' ? (
                   <button type="button" className="danger" onClick={stopRecording}>
-                    Stop {formatDuration(recorder.elapsedSeconds)}
+                    녹음 중지 {formatDuration(recorder.elapsedSeconds)}
                   </button>
                 ) : (
                   <button type="button" onClick={startRecording} disabled={recorder.status === 'uploading'}>
-                    {recorder.status === 'uploading' ? 'Uploading...' : 'Start recording'}
+                    {recorder.status === 'uploading' ? '업로드 중...' : '녹음 시작'}
                   </button>
                 )}
               </div>
 
               {recorder.status === 'uploaded' && (
                 <p className="result success">
-                  Saved {recorder.memo.title}. Transcription is {recorder.memo.transcriptionStatus.toLowerCase()}.
+                  {recorder.memo.title} 메모를 저장했습니다. 전사 상태는 {formatStatus(recorder.memo.transcriptionStatus)}입니다.
                 </p>
               )}
 
@@ -464,24 +464,24 @@ function App() {
               )}
 
               <div className="search-panel">
-                <h2>Search</h2>
+                <h2>검색</h2>
                 <div className="search-input-wrapper">
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search titles and transcripts..."
-                    aria-label="Search recordings"
+                    placeholder="제목과 전사 내용 검색..."
+                    aria-label="녹음 검색"
                     className="search-input"
                   />
                 </div>
 
                 {searchQuery.trim() === '' && (
-                  <p className="search-guide muted">Enter a search term to find memos.</p>
+                  <p className="search-guide muted">검색어를 입력해 저장된 메모를 찾아보세요.</p>
                 )}
 
                 {searchQuery.trim() !== '' && search.status === 'searching' && (
-                  <p className="muted">Searching...</p>
+                  <p className="muted">검색 중...</p>
                 )}
 
                 {search.status === 'failed' && (
@@ -491,7 +491,7 @@ function App() {
                 {search.status === 'ready' && searchQuery.trim() !== '' && (
                   <div className="search-results">
                     {search.results.length === 0 ? (
-                      <p className="muted">No results found.</p>
+                      <p className="muted">검색 결과가 없습니다.</p>
                     ) : (
                       <ul className="search-results-list">
                         {search.results.map((result) => (
@@ -506,11 +506,11 @@ function App() {
                                 {result.segmentStartSeconds != null && (
                                   <span className="search-result-timestamp">{formatTimestamp(result.segmentStartSeconds)}</span>
                                 )}
-                                <span className="badge-match-type">{result.matchType}</span>
+                                <span className="badge-match-type">{formatMatchType(result.matchType)}</span>
                               </div>
                               <p className="search-result-snippet">{result.snippet}</p>
                               <small className="search-result-status">
-                                Status: {result.transcriptionStatus.toLowerCase()}
+                                상태: {formatStatus(result.transcriptionStatus)}
                               </small>
                             </button>
                           </li>
@@ -524,16 +524,16 @@ function App() {
               <div className="library-panel">
                 <div className="library-heading">
                   <div>
-                    <h2>Saved memos</h2>
-                    <p>Browse recordings saved to your account.</p>
+                    <h2>저장된 메모</h2>
+                    <p>계정에 저장된 녹음과 전사 내용을 확인합니다.</p>
                   </div>
                   <button type="button" onClick={refreshMemos} disabled={memoState.status === 'loading'}>
-                    {memoState.status === 'loading' ? 'Loading...' : 'Refresh'}
+                    {memoState.status === 'loading' ? '불러오는 중...' : '새로고침'}
                   </button>
                 </div>
 
                 {memoState.status === 'ready' && memoState.memos.length === 0 && (
-                  <p className="muted">No recordings saved yet.</p>
+                  <p className="muted">아직 저장된 녹음이 없습니다.</p>
                 )}
 
                 {memoState.status === 'ready' && memoState.memos.length > 0 && (
@@ -543,7 +543,7 @@ function App() {
                         <button type="button" onClick={() => selectMemo(memo.id)}>
                           <span>{memo.title}</span>
                           <small>
-                            {memo.transcriptionStatus.toLowerCase()} · {formatBytes(memo.audioSizeBytes)}
+                            {formatStatus(memo.transcriptionStatus)} · {formatBytes(memo.audioSizeBytes)}
                           </small>
                         </button>
                       </li>
@@ -556,13 +556,13 @@ function App() {
                 )}
 
                 {playback.status === 'loading' && (
-                  <p className="muted">Loading selected memo...</p>
+                  <p className="muted">선택한 메모를 불러오는 중...</p>
                 )}
 
                 {playback.status === 'ready' && (
                   <div className="playback-panel">
                     <div>
-                      <span className="label">Selected memo</span>
+                      <span className="label">선택한 메모</span>
                       <strong>{playback.memo.title}</strong>
                       <span className="muted">
                         {new Date(playback.memo.createdAt).toLocaleString()}
@@ -574,12 +574,12 @@ function App() {
                     <div className="transcript-panel">
                       <div className="library-heading">
                         <div>
-                          <h2>Transcript</h2>
+                          <h2>전사</h2>
                           <p>
-                            Status:{' '}
+                            상태:{' '}
                             {transcript.status === 'ready'
-                              ? transcript.transcript.status.toLowerCase()
-                              : playback.memo.transcriptionStatus.toLowerCase()}
+                              ? formatStatus(transcript.transcript.status)
+                              : formatStatus(playback.memo.transcriptionStatus)}
                           </p>
                         </div>
                         <button
@@ -588,7 +588,7 @@ function App() {
                           disabled={transcript.status === 'loading'
                             || (transcript.status === 'ready' && transcript.transcript.status === 'PROCESSING')}
                         >
-                          {transcript.status === 'loading' ? 'Transcribing...' : 'Start transcription'}
+                          {transcript.status === 'loading' ? '전사 중...' : '전사 시작'}
                         </button>
                       </div>
 
@@ -617,13 +617,13 @@ function App() {
                       )}
 
                       {transcript.status === 'ready' && transcript.transcript.status === 'FAILED' && (
-                        <p className="result failure">Transcription failed.</p>
+                        <p className="result failure">전사에 실패했습니다.</p>
                       )}
 
                       {transcript.status === 'ready'
                         && transcript.transcript.status !== 'FAILED'
                         && !transcript.transcript.text && (
-                        <p className="muted">No transcript has been created yet.</p>
+                        <p className="muted">아직 생성된 전사 내용이 없습니다.</p>
                       )}
 
                       {transcript.status === 'failed' && (
@@ -642,26 +642,26 @@ function App() {
 
           {auth.status === 'guest' && (
             <form className="auth-form" onSubmit={submitAuth}>
-              <div className="mode-switch" aria-label="Authentication mode">
+              <div className="mode-switch" aria-label="인증 모드">
                 <button
                   type="button"
                   className={mode === 'login' ? 'active' : ''}
                   onClick={() => setMode('login')}
                 >
-                  Login
+                  로그인
                 </button>
                 <button
                   type="button"
                   className={mode === 'signup' ? 'active' : ''}
                   onClick={() => setMode('signup')}
                 >
-                  Sign up
+                  회원가입
                 </button>
               </div>
 
               {mode === 'signup' && (
                 <label>
-                  Display name
+                  표시 이름
                   <input
                     value={displayName}
                     onChange={(event) => setDisplayName(event.target.value)}
@@ -673,7 +673,7 @@ function App() {
               )}
 
               <label>
-                Email
+                이메일
                 <input
                   type="email"
                   value={email}
@@ -684,7 +684,7 @@ function App() {
               </label>
 
               <label>
-                Password
+                비밀번호
                 <input
                   type="password"
                   value={password}
@@ -696,7 +696,7 @@ function App() {
               </label>
 
               <button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : mode === 'signup' ? 'Create account' : 'Log in'}
+                {isSubmitting ? '처리 중...' : mode === 'signup' ? '계정 만들기' : '로그인'}
               </button>
             </form>
           )}
@@ -706,17 +706,17 @@ function App() {
 
         <div className="status-panel">
           <div>
-            <h2>Backend connection</h2>
-            <p>Calls <code>/api/health</code> with browser credentials included.</p>
+            <h2>API 연결 상태</h2>
+            <p>브라우저 세션을 포함해 <code>/api/health</code>를 호출합니다.</p>
           </div>
           <button type="button" onClick={checkBackend} disabled={health.status === 'loading'}>
-            {health.status === 'loading' ? 'Checking...' : 'Check API'}
+            {health.status === 'loading' ? '확인 중...' : 'API 확인'}
           </button>
         </div>
 
         {health.status === 'ready' && (
           <p className="result success">
-            API is {health.data.status}. Last checked at {new Date(health.data.timestamp).toLocaleString()}.
+            API 상태는 {health.data.status === 'ok' ? '정상' : health.data.status}입니다. 마지막 확인 시간은 {new Date(health.data.timestamp).toLocaleString()}입니다.
           </p>
         )}
 
@@ -739,6 +739,34 @@ function formatTimestamp(seconds: number): string {
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
   const secs = (totalSeconds % 60).toString().padStart(2, '0');
   return `${minutes}:${secs}`;
+}
+
+function formatStatus(status: string): string {
+  switch (status) {
+    case 'PENDING':
+      return '대기 중';
+    case 'PROCESSING':
+      return '처리 중';
+    case 'COMPLETED':
+      return '완료';
+    case 'FAILED':
+      return '실패';
+    case 'UPLOADED':
+      return '업로드 완료';
+    default:
+      return status.toLowerCase();
+  }
+}
+
+function formatMatchType(matchType: string): string {
+  switch (matchType) {
+    case 'TITLE':
+      return '제목';
+    case 'TRANSCRIPT':
+      return '전사';
+    default:
+      return matchType;
+  }
 }
 
 function formatBytes(bytes: number): string {
