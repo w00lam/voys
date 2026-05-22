@@ -105,7 +105,7 @@ public class SecurityConfig {
 		@Value("${voys.frontend.origin}") String frontendOrigin
 	) {
 		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOrigins(List.of(frontendOrigin));
+		configuration.setAllowedOrigins(localFrontendOrigins(frontendOrigin));
 		configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
 		configuration.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN", "X-XSRF-TOKEN"));
 		configuration.setAllowCredentials(true);
@@ -113,6 +113,16 @@ public class SecurityConfig {
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/api/**", configuration);
 		return source;
+	}
+
+	private List<String> localFrontendOrigins(String frontendOrigin) {
+		if ("http://localhost:5173".equals(frontendOrigin)) {
+			return List.of(frontendOrigin, "http://127.0.0.1:5173");
+		}
+		if ("http://127.0.0.1:5173".equals(frontendOrigin)) {
+			return List.of(frontendOrigin, "http://localhost:5173");
+		}
+		return List.of(frontendOrigin);
 	}
 }
 
