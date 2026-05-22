@@ -67,7 +67,11 @@ public class TranscriptionWorkflowService {
 		return transactionTemplate.execute(status -> {
 			VoiceMemo memo = findOwnedMemo(ownerId, memoId);
 			Transcript transcript = transcriptRepository.findByMemoId(memoId).orElse(null);
-			return TranscriptionResponse.from(memo, transcript);
+			List<TranscriptSegment> segments = List.of();
+			if (transcript != null) {
+				segments = transcriptSegmentRepository.findByTranscriptOrderByPositionAsc(transcript);
+			}
+			return TranscriptionResponse.from(memo, transcript, segments);
 		});
 	}
 
@@ -119,7 +123,11 @@ public class TranscriptionWorkflowService {
 		return transactionTemplate.execute(status -> {
 			VoiceMemo memo = findOwnedMemo(ownerId, memoId);
 			Transcript transcript = transcriptRepository.findByMemoId(memoId).orElse(null);
-			return TranscriptionResponse.from(memo, transcript);
+			List<TranscriptSegment> segments = List.of();
+			if (transcript != null) {
+				segments = transcriptSegmentRepository.findByTranscriptOrderByPositionAsc(transcript);
+			}
+			return TranscriptionResponse.from(memo, transcript, segments);
 		});
 	}
 
@@ -133,17 +141,37 @@ public class TranscriptionWorkflowService {
 			.orElseThrow(() -> new MemoNotFoundException(memoId));
 	}
 
+	public record SegmentDto(
+		int position,
+		double startSeconds,
+		double endSeconds,
+		String text
+	) {}
+
 	public record TranscriptionResponse(
 		String memoId,
 		String status,
 		String text,
+		List<SegmentDto> segments,
 		String updatedAt
 	) {
-		static TranscriptionResponse from(VoiceMemo memo, Transcript transcript) {
+		static TranscriptionResponse from(VoiceMemo memo, Transcript transcript, List<TranscriptSegment> segments) {
+			List<SegmentDto> segmentDtos = new ArrayList<>();
+			if (segments != null) {
+				for (var segment : segments) {
+					segmentDtos.add(new SegmentDto(
+						segment.getPosition(),
+						segment.getStartSeconds(),
+						segment.getEndSeconds(),
+						segment.getText()
+					));
+				}
+			}
 			return new TranscriptionResponse(
 				memo.getId().toString(),
 				memo.getTranscriptionStatus().name(),
 				transcript == null ? null : transcript.getText(),
+				segmentDtos,
 				(transcript == null || transcript.getUpdatedAt() == null) ? null : transcript.getUpdatedAt().toString()
 			);
 		}
