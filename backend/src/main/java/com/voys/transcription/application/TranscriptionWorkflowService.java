@@ -1,5 +1,7 @@
 package com.voys.transcription.application;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -15,6 +17,8 @@ import com.voys.memo.infrastructure.persistence.VoiceMemoRepository;
 import com.voys.transcription.domain.TranscriptionAlreadyRunningException;
 import com.voys.transcription.infrastructure.persistence.Transcript;
 import com.voys.transcription.infrastructure.persistence.TranscriptRepository;
+import com.voys.transcription.infrastructure.persistence.TranscriptSegment;
+import com.voys.transcription.infrastructure.persistence.TranscriptSegmentRepository;
 
 @Service
 public class TranscriptionWorkflowService {
@@ -22,6 +26,7 @@ public class TranscriptionWorkflowService {
 	private final VoiceMemoRepository voiceMemoRepository;
 	private final AudioAssetRepository audioAssetRepository;
 	private final TranscriptRepository transcriptRepository;
+	private final TranscriptSegmentRepository transcriptSegmentRepository;
 	private final StoragePort storagePort;
 	private final TranscriptionPort transcriptionPort;
 	private final TranscriptionJobRunner transcriptionJobRunner;
@@ -31,6 +36,7 @@ public class TranscriptionWorkflowService {
 		VoiceMemoRepository voiceMemoRepository,
 		AudioAssetRepository audioAssetRepository,
 		TranscriptRepository transcriptRepository,
+		TranscriptSegmentRepository transcriptSegmentRepository,
 		StoragePort storagePort,
 		TranscriptionPort transcriptionPort,
 		TranscriptionJobRunner transcriptionJobRunner,
@@ -39,6 +45,7 @@ public class TranscriptionWorkflowService {
 		this.voiceMemoRepository = voiceMemoRepository;
 		this.audioAssetRepository = audioAssetRepository;
 		this.transcriptRepository = transcriptRepository;
+		this.transcriptSegmentRepository = transcriptSegmentRepository;
 		this.storagePort = storagePort;
 		this.transcriptionPort = transcriptionPort;
 		this.transcriptionJobRunner = transcriptionJobRunner;
@@ -76,10 +83,28 @@ public class TranscriptionWorkflowService {
 				Transcript transcript = transcriptRepository.findByMemoId(memoId)
 					.map(existing -> {
 						existing.replaceText(result.text());
+						transcriptSegmentRepository.deleteByTranscript(existing);
 						return existing;
 					})
 					.orElseGet(() -> Transcript.create(memo, result.text()));
-				transcriptRepository.save(transcript);
+
+				Transcript savedTranscript = transcriptRepository.save(transcript);
+
+				if (result.segments() != null) {
+					List<TranscriptSegment> segmentsToSave = new ArrayList<>();
+					for (int i = 0; i < result.segments().size(); i++) {
+						var segResult = result.segments().get(i);
+						segmentsToSave.add(TranscriptSegment.create(
+							savedTranscript,
+							i,
+							segResult.startSeconds(),
+							segResult.endSeconds(),
+							segResult.text()
+						));
+					}
+					transcriptSegmentRepository.saveAll(segmentsToSave);
+				}
+
 				memo.markTranscriptionCompleted();
 			});
 		} catch (RuntimeException exception) {
@@ -119,7 +144,7 @@ public class TranscriptionWorkflowService {
 				memo.getId().toString(),
 				memo.getTranscriptionStatus().name(),
 				transcript == null ? null : transcript.getText(),
-				transcript == null ? null : transcript.getUpdatedAt().toString()
+				(transcript == null || transcript.getUpdatedAt() == null) ? null : transcript.getUpdatedAt().toString()
 			);
 		}
 	}

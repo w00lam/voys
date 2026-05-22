@@ -13,6 +13,8 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.voys.transcription.application.TranscriptionPort;
 import com.voys.transcription.domain.TranscriptionFailedException;
 
@@ -22,6 +24,7 @@ public class LocalWhisperAdapter implements TranscriptionPort {
 	private final String whisperCommand;
 	private final Path outputRoot;
 	private final Duration timeout;
+	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	public LocalWhisperAdapter(
 		@Value("${voys.whisper.command:whisper}") String whisperCommand,
@@ -54,7 +57,7 @@ public class LocalWhisperAdapter implements TranscriptionPort {
 				throw new TranscriptionFailedException("Whisper transcription failed: " + output);
 			}
 
-			return new TranscriptionResult(readTranscriptText(outputDirectory));
+			return readTranscriptJson(outputDirectory);
 		} catch (IOException exception) {
 			throw new TranscriptionFailedException("Whisper CLI could not be executed.", exception);
 		} catch (InterruptedException exception) {
@@ -70,7 +73,7 @@ public class LocalWhisperAdapter implements TranscriptionPort {
 		command.add("--output_dir");
 		command.add(outputDirectory.toString());
 		command.add("--output_format");
-		command.add("txt");
+		command.add("json");
 
 		if (request.language() != null && !request.language().isBlank()) {
 			command.add("--language");
@@ -80,14 +83,29 @@ public class LocalWhisperAdapter implements TranscriptionPort {
 		return command;
 	}
 
-	private String readTranscriptText(Path outputDirectory) throws IOException {
+	private TranscriptionResult readTranscriptJson(Path outputDirectory) throws IOException {
 		try (var paths = Files.list(outputDirectory)) {
-			Path transcript = paths
-				.filter(path -> path.getFileName().toString().endsWith(".txt"))
+			Path jsonPath = paths
+				.filter(path -> path.getFileName().toString().endsWith(".json"))
 				.findFirst()
-				.orElseThrow(() -> new TranscriptionFailedException("Whisper did not produce a text transcript."));
+				.orElseThrow(() -> new TranscriptionFailedException("Whisper did not produce a JSON transcript."));
 
-			return Files.readString(transcript, StandardCharsets.UTF_8).trim();
+			byte[] jsonData = Files.readAllBytes(jsonPath);
+			JsonNode root = objectMapper.readTree(jsonData);
+			String text = root.path("text").asText("").trim();
+
+			List<TranscriptionSegment> segments = new ArrayList<>();
+			JsonNode segmentsNode = root.path("segments");
+			if (segmentsNode.isArray()) {
+				for (JsonNode segmentNode : segmentsNode) {
+					double start = segmentNode.path("start").asDouble();
+					double end = segmentNode.path("end").asDouble();
+					String segmentText = segmentNode.path("text").asText("").trim();
+					segments.add(new TranscriptionSegment(start, end, segmentText));
+				}
+			}
+
+			return new TranscriptionResult(text, segments);
 		}
 	}
 }

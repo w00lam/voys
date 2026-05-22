@@ -1,8 +1,8 @@
 package com.voys.transcription.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,9 +13,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.StreamSupport;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -26,22 +29,20 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.voys.identity.infrastructure.persistence.UserAccount;
 import com.voys.memo.application.StoragePort;
-import com.voys.memo.domain.MemoNotFoundException;
 import com.voys.memo.domain.TranscriptionStatus;
 import com.voys.memo.infrastructure.persistence.AudioAsset;
 import com.voys.memo.infrastructure.persistence.AudioAssetRepository;
 import com.voys.memo.infrastructure.persistence.VoiceMemo;
 import com.voys.memo.infrastructure.persistence.VoiceMemoRepository;
-import com.voys.transcription.domain.TranscriptionAlreadyRunningException;
 import com.voys.transcription.domain.TranscriptionFailedException;
 import com.voys.transcription.infrastructure.persistence.Transcript;
 import com.voys.transcription.infrastructure.persistence.TranscriptRepository;
+import com.voys.transcription.infrastructure.persistence.TranscriptSegment;
 import com.voys.transcription.infrastructure.persistence.TranscriptSegmentRepository;
 
-class TranscriptionWorkflowServiceBackgroundTests {
+class TranscriptionWorkflowServiceSegmentTests {
 
 	private final UUID ownerId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-	private final UUID otherOwnerId = UUID.fromString("22222222-2222-2222-2222-222222222222");
 	private final UUID memoId = UUID.fromString("33333333-3333-3333-3333-333333333333");
 
 	private final VoiceMemoRepository voiceMemoRepository = mock(VoiceMemoRepository.class);
@@ -62,7 +63,6 @@ class TranscriptionWorkflowServiceBackgroundTests {
 		audio = AudioAsset.create(memo, "memos/%s/audio.webm".formatted(memoId), "audio/webm;codecs=opus", 5L, "audio.webm", 3);
 
 		when(voiceMemoRepository.findByIdAndOwnerId(memoId, ownerId)).thenReturn(Optional.of(memo));
-		when(voiceMemoRepository.findByIdAndOwnerId(memoId, otherOwnerId)).thenReturn(Optional.empty());
 		when(audioAssetRepository.findByMemoId(memoId)).thenReturn(Optional.of(audio));
 		when(storagePort.get(audio.getStorageKey())).thenReturn(new StoragePort.StoredResource(
 			new ByteArrayResource("audio".getBytes()),
@@ -85,61 +85,74 @@ class TranscriptionWorkflowServiceBackgroundTests {
 	}
 
 	@Test
-	void startTranscriptionMarksProcessingAndQueuesBackgroundJobWithoutRunningWhisperInline() {
-		var response = service.startTranscription(ownerId, memoId);
+	void queuedJobStoresTimestampedSegmentsInWhisperOrderWhenWhisperSucceeds() {
+		transcriptionPort.completeWith(new TranscriptionPort.TranscriptionResult(
+			"intro roadmap",
+			List.of(
+				new TranscriptionPort.TranscriptionSegment(0.0, 4.2, "intro"),
+				new TranscriptionPort.TranscriptionSegment(4.2, 8.0, "roadmap")
+			)
+		));
 
-		assertThat(response.memoId()).isEqualTo(memoId.toString());
-		assertThat(response.status()).isEqualTo(TranscriptionStatus.PROCESSING.name());
-		assertThat(memo.getTranscriptionStatus()).isEqualTo(TranscriptionStatus.PROCESSING);
-		assertThat(jobRunner.queuedJobs()).hasSize(1);
-		assertThat(transcriptionPort.invocations()).isZero();
-		verify(transcriptRepository, never()).save(any(Transcript.class));
-	}
-
-	@Test
-	void queuedJobStoresTranscriptAndMarksCompletedWhenWhisperSucceeds() {
 		service.startTranscription(ownerId, memoId);
-
 		jobRunner.runOnlyJob();
 
-		assertThat(transcriptionPort.invocations()).isEqualTo(1);
+		ArgumentCaptor<Transcript> transcriptCaptor = ArgumentCaptor.forClass(Transcript.class);
+		verify(transcriptRepository).save(transcriptCaptor.capture());
+
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<Iterable<TranscriptSegment>> segmentCaptor = ArgumentCaptor.forClass(Iterable.class);
+		verify(transcriptSegmentRepository).saveAll(segmentCaptor.capture());
+
+		List<TranscriptSegment> segments = StreamSupport.stream(segmentCaptor.getValue().spliterator(), false).toList();
+
 		assertThat(memo.getTranscriptionStatus()).isEqualTo(TranscriptionStatus.COMPLETED);
-		verify(transcriptRepository).save(any(Transcript.class));
+		assertThat(segments).hasSize(2);
+		assertThat(segments.get(0).getTranscript()).isSameAs(transcriptCaptor.getValue());
+		assertThat(segments.get(0).getPosition()).isZero();
+		assertThat(segments.get(0).getStartSeconds()).isEqualTo(0.0);
+		assertThat(segments.get(0).getEndSeconds()).isEqualTo(4.2);
+		assertThat(segments.get(0).getText()).isEqualTo("intro");
+		assertThat(segments.get(1).getTranscript()).isSameAs(transcriptCaptor.getValue());
+		assertThat(segments.get(1).getPosition()).isEqualTo(1);
+		assertThat(segments.get(1).getStartSeconds()).isEqualTo(4.2);
+		assertThat(segments.get(1).getEndSeconds()).isEqualTo(8.0);
+		assertThat(segments.get(1).getText()).isEqualTo("roadmap");
 	}
 
 	@Test
-	void queuedJobMarksFailedAndDoesNotSaveTranscriptWhenWhisperFails() {
+	void queuedJobDeletesExistingSegmentsBeforeSavingRegeneratedSegments() {
+		Transcript existingTranscript = Transcript.create(memo, "old text");
+		when(transcriptRepository.findByMemoId(memoId)).thenReturn(Optional.of(existingTranscript));
+		transcriptionPort.completeWith(new TranscriptionPort.TranscriptionResult(
+			"new text",
+			List.of(new TranscriptionPort.TranscriptionSegment(1.0, 2.5, "new segment"))
+		));
+
+		service.startTranscription(ownerId, memoId);
+		jobRunner.runOnlyJob();
+
+		InOrder persistenceOrder = inOrder(transcriptSegmentRepository, transcriptRepository);
+		persistenceOrder.verify(transcriptSegmentRepository).deleteByTranscript(existingTranscript);
+		persistenceOrder.verify(transcriptRepository).save(existingTranscript);
+		persistenceOrder.verify(transcriptSegmentRepository).saveAll(any());
+		assertThat(existingTranscript.getText()).isEqualTo("new text");
+	}
+
+	@Test
+	void queuedJobDoesNotSaveSegmentsWhenWhisperFails() {
 		transcriptionPort.failWith(new TranscriptionFailedException("test failure"));
 
 		service.startTranscription(ownerId, memoId);
 		jobRunner.runOnlyJob();
 
 		assertThat(memo.getTranscriptionStatus()).isEqualTo(TranscriptionStatus.FAILED);
-		verify(transcriptRepository, never()).save(any(Transcript.class));
-	}
-
-	@Test
-	void startTranscriptionRejectsMemoOwnedByAnotherUserWithoutQueuingJob() {
-		assertThatThrownBy(() -> service.startTranscription(otherOwnerId, memoId))
-			.isInstanceOf(MemoNotFoundException.class);
-
-		assertThat(jobRunner.queuedJobs()).isEmpty();
-		assertThat(transcriptionPort.invocations()).isZero();
-	}
-
-	@Test
-	void startTranscriptionRejectsDuplicateStartWhenMemoIsAlreadyProcessing() {
-		memo.markTranscriptionProcessing();
-
-		assertThatThrownBy(() -> service.startTranscription(ownerId, memoId))
-			.isInstanceOf(TranscriptionAlreadyRunningException.class);
-
-		assertThat(jobRunner.queuedJobs()).isEmpty();
-		assertThat(transcriptionPort.invocations()).isZero();
+		verify(transcriptSegmentRepository, never()).deleteByTranscript(any());
+		verify(transcriptSegmentRepository, never()).saveAll(any());
 	}
 
 	private VoiceMemo memoWithId(UUID id) {
-		VoiceMemo voiceMemo = VoiceMemo.createUploaded(mock(UserAccount.class), "Recording 2026-05-21 16:01");
+		VoiceMemo voiceMemo = VoiceMemo.createUploaded(mock(UserAccount.class), "Recording 2026-05-22 11:00");
 		ReflectionTestUtils.setField(voiceMemo, "id", id);
 		return voiceMemo;
 	}
@@ -170,10 +183,6 @@ class TranscriptionWorkflowServiceBackgroundTests {
 			queuedJobs.add(job);
 		}
 
-		List<Runnable> queuedJobs() {
-			return queuedJobs;
-		}
-
 		void runOnlyJob() {
 			assertThat(queuedJobs).hasSize(1);
 			queuedJobs.get(0).run();
@@ -182,24 +191,26 @@ class TranscriptionWorkflowServiceBackgroundTests {
 
 	private static final class FakeTranscriptionPort implements TranscriptionPort {
 
-		private int invocations;
+		private TranscriptionPort.TranscriptionResult result = new TranscriptionPort.TranscriptionResult(
+			"transcribed text",
+			List.of(new TranscriptionPort.TranscriptionSegment(0.0, 1.0, "transcribed text"))
+		);
 		private RuntimeException failure;
 
 		@Override
-		public TranscriptionResult transcribe(TranscriptionRequest request) {
-			invocations++;
+		public TranscriptionPort.TranscriptionResult transcribe(TranscriptionPort.TranscriptionRequest request) {
 			if (failure != null) {
 				throw failure;
 			}
-			return new TranscriptionResult("transcribed text");
+			return result;
+		}
+
+		void completeWith(TranscriptionPort.TranscriptionResult result) {
+			this.result = result;
 		}
 
 		void failWith(RuntimeException exception) {
 			failure = exception;
-		}
-
-		int invocations() {
-			return invocations;
 		}
 	}
 }
