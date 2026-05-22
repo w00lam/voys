@@ -25,6 +25,14 @@ export type TranscriptResponse = {
   status: string;
   text: string | null;
   updatedAt: string | null;
+  segments: TranscriptSegment[];
+};
+
+export type TranscriptSegment = {
+  position: number;
+  startSeconds: number;
+  endSeconds: number;
+  text: string;
 };
 
 export function listMemos(): Promise<MemoSummary[]> {
