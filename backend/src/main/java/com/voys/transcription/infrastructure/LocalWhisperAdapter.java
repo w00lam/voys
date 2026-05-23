@@ -22,16 +22,25 @@ import com.voys.transcription.domain.TranscriptionFailedException;
 public class LocalWhisperAdapter implements TranscriptionPort {
 
 	private final String whisperCommand;
+	private final String model;
+	private final String language;
+	private final boolean fp16;
 	private final Path outputRoot;
 	private final Duration timeout;
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	public LocalWhisperAdapter(
 		@Value("${voys.whisper.command:whisper}") String whisperCommand,
+		@Value("${voys.whisper.model:tiny}") String model,
+		@Value("${voys.whisper.language:Korean}") String language,
+		@Value("${voys.whisper.fp16:false}") boolean fp16,
 		@Value("${voys.whisper.output-root:storage/transcripts}") Path outputRoot,
 		@Value("${voys.whisper.timeout-seconds:7200}") long timeoutSeconds
 	) {
 		this.whisperCommand = whisperCommand;
+		this.model = model;
+		this.language = language;
+		this.fp16 = fp16;
 		this.outputRoot = outputRoot.toAbsolutePath().normalize();
 		this.timeout = Duration.ofSeconds(timeoutSeconds);
 	}
@@ -66,7 +75,7 @@ public class LocalWhisperAdapter implements TranscriptionPort {
 		}
 	}
 
-	private List<String> buildCommand(TranscriptionRequest request, Path outputDirectory) {
+	List<String> buildCommand(TranscriptionRequest request, Path outputDirectory) {
 		List<String> command = new ArrayList<>();
 		command.add(whisperCommand);
 		command.add(request.audioPath().toString());
@@ -74,13 +83,30 @@ public class LocalWhisperAdapter implements TranscriptionPort {
 		command.add(outputDirectory.toString());
 		command.add("--output_format");
 		command.add("json");
+		if (model != null && !model.isBlank()) {
+			command.add("--model");
+			command.add(model);
+		}
+		command.add("--fp16");
+		command.add(fp16 ? "True" : "False");
 
-		if (request.language() != null && !request.language().isBlank()) {
+		String transcriptionLanguage = transcriptionLanguage(request);
+		if (transcriptionLanguage != null) {
 			command.add("--language");
-			command.add(request.language());
+			command.add(transcriptionLanguage);
 		}
 
 		return command;
+	}
+
+	private String transcriptionLanguage(TranscriptionRequest request) {
+		if (request.language() != null && !request.language().isBlank()) {
+			return request.language();
+		}
+		if (language != null && !language.isBlank()) {
+			return language;
+		}
+		return null;
 	}
 
 	private TranscriptionResult readTranscriptJson(Path outputDirectory) throws IOException {
