@@ -45,6 +45,7 @@ coverage/
 tmp/
 temp/
 /storage/
+/backend/storage/
 *.pid
 *.seed
 *.stackdump

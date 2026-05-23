@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -22,6 +24,8 @@ import com.voys.transcription.infrastructure.persistence.TranscriptSegmentReposi
 
 @Service
 public class TranscriptionWorkflowService {
+
+	private static final Logger log = LoggerFactory.getLogger(TranscriptionWorkflowService.class);
 
 	private final VoiceMemoRepository voiceMemoRepository;
 	private final AudioAssetRepository audioAssetRepository;
@@ -112,6 +116,7 @@ public class TranscriptionWorkflowService {
 				memo.markTranscriptionCompleted();
 			});
 		} catch (RuntimeException exception) {
+			log.error("Transcription job failed for memo {}", memoId, exception);
 			transactionTemplate.executeWithoutResult(status -> {
 				VoiceMemo memo = findOwnedMemo(ownerId, memoId);
 				memo.markTranscriptionFailed();
