@@ -13,8 +13,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -33,6 +35,9 @@ class AuthControllerCsrfIntegrationTests {
 
 	@Autowired
 	private ObjectMapper objectMapper;
+
+	@Autowired
+	private CorsConfigurationSource corsConfigurationSource;
 
 	@Test
 	void signUpAcceptsCsrfTokenIssuedForBrowserSession() throws Exception {
@@ -61,5 +66,13 @@ class AuthControllerCsrfIntegrationTests {
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.email").value("csrf-user@example.com"))
 			.andExpect(jsonPath("$.displayName").value("CSRF User"));
+	}
+
+	@Test
+	void corsAllowsLocalhostAndLoopbackFrontendOrigins() {
+		MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/csrf");
+
+		assertThat(corsConfigurationSource.getCorsConfiguration(request).getAllowedOrigins())
+			.contains("http://localhost:5173", "http://127.0.0.1:5173");
 	}
 }
