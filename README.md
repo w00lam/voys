@@ -74,6 +74,35 @@ cmd /c npm run dev
 
 The Vite dev server proxies `/api` requests to the backend at `http://localhost:8080`.
 
+## Docker Local Stack
+
+Build and run the full local stack:
+
+```powershell
+docker compose up --build
+```
+
+Open the web app:
+
+```text
+http://localhost:3000
+```
+
+The Docker stack runs:
+
+- PostgreSQL on `localhost:5432`.
+- Spring Boot backend on `localhost:8080`.
+- Frontend nginx server on `localhost:3000`, with `/api` proxied to the backend.
+- Whisper CLI and ffmpeg inside the backend container.
+
+Docker volumes keep runtime data outside Git:
+
+- `postgres-data` for database data.
+- `app-storage` for uploaded audio and transcript output.
+- `whisper-cache` for downloaded Whisper models.
+
+The default Docker Whisper model is `tiny` so the first local build and demo run stay manageable. Use `VOYS_WHISPER_MODEL=base` or `small` later when transcription quality matters more than speed.
+
 ## Configuration
 
 Useful environment variables are listed in `.env.example`.
