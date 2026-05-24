@@ -16,6 +16,44 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: ./backend
+    container_name: voys-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/voys
+      SPRING_DATASOURCE_USERNAME: voys
+      SPRING_DATASOURCE_PASSWORD: voys
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      VOYS_FRONTEND_ORIGIN: http://localhost:3000
+      VOYS_STORAGE_ROOT: /app/storage/audio
+      VOYS_WHISPER_COMMAND: whisper
+      VOYS_WHISPER_MODEL: tiny
+      VOYS_WHISPER_LANGUAGE: Korean
+      VOYS_WHISPER_FP16: "false"
+      VOYS_WHISPER_OUTPUT_ROOT: /app/storage/transcripts
+      VOYS_WHISPER_TIMEOUT_SECONDS: 7200
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - app-storage:/app/storage
+      - whisper-cache:/home/voys/.cache/whisper
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: voys-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
 volumes:
   postgres-data:
+  app-storage:
+  whisper-cache:
 
