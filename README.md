@@ -76,6 +76,8 @@ The Vite dev server proxies `/api` requests to the backend at `http://localhost:
 
 ## Docker Local Stack
 
+When using the Docker path, local Java, Node.js, npm, and Whisper installation are not required. Docker Desktop and an internet connection are enough for the first build.
+
 Build and run the full local stack:
 
 ```powershell
@@ -102,6 +104,36 @@ Docker volumes keep runtime data outside Git:
 - `whisper-cache` for downloaded Whisper models.
 
 The default Docker Whisper model is `tiny` so the first local build and demo run stay manageable. Use `VOYS_WHISPER_MODEL=base` or `small` later when transcription quality matters more than speed.
+
+### Running From A Shared Zip
+
+If you received `voys-docker-local-stack.zip`, make sure Docker Desktop is running first, then unzip and start the stack:
+
+```powershell
+Expand-Archive .\voys-docker-local-stack.zip
+cd .\voys
+docker compose up --build
+```
+
+Open the web app:
+
+```text
+http://localhost:3000
+```
+
+The first run can take a while because Docker downloads base images and builds the backend image with Whisper, ffmpeg, and CPU-only Torch dependencies.
+
+Stop the stack:
+
+```powershell
+docker compose down
+```
+
+To reset local database, uploaded audio, transcripts, and downloaded Whisper models, remove Docker volumes too:
+
+```powershell
+docker compose down -v
+```
 
 ## Configuration
 

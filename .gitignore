@@ -46,6 +46,7 @@ tmp/
 temp/
 /storage/
 /backend/storage/
+*.zip
 *.pid
 *.seed
 *.stackdump
