@@ -79,6 +79,50 @@ public class TranscriptionWorkflowService {
 		});
 	}
 
+	private record FailureReason(String code, String message, boolean retryable) {}
+
+	private FailureReason mapToFailureReason(Throwable exception) {
+		String msg = exception.getMessage() != null ? exception.getMessage() : "";
+		Throwable cause = exception.getCause();
+		String causeMsg = cause != null && cause.getMessage() != null ? cause.getMessage() : "";
+
+		String fullText = (msg + " " + causeMsg).toLowerCase();
+
+		if (msg.contains("Whisper CLI could not be executed.")) {
+			return new FailureReason(
+				"WHISPER_COMMAND_NOT_FOUND",
+				"Whisper CLI is not installed or not available to the backend process.",
+				true
+			);
+		} else if (msg.contains("Whisper transcription timed out.")) {
+			return new FailureReason(
+				"WHISPER_TIMEOUT",
+				"Whisper transcription timed out.",
+				true
+			);
+		} else if (msg.contains("Whisper did not produce a JSON transcript.")) {
+			return new FailureReason(
+				"WHISPER_EMPTY_OUTPUT",
+				"Whisper completed but did not produce usable transcript output.",
+				true
+			);
+		} else if (fullText.contains("invalid audio") || fullText.contains("decode error") ||
+				fullText.contains("ffmpeg") || fullText.contains("error decoding") ||
+				fullText.contains("unsupported") || fullText.contains("invalid")) {
+			return new FailureReason(
+				"AUDIO_UNSUPPORTED_OR_INVALID",
+				"Audio cannot be processed by Whisper or ffmpeg.",
+				false
+			);
+		} else {
+			return new FailureReason(
+				"TRANSCRIPTION_UNEXPECTED_ERROR",
+				"An unexpected error occurred during transcription.",
+				true
+			);
+		}
+	}
+
 	private void runTranscriptionJob(UUID ownerId, UUID memoId, AudioAsset audio) {
 		try {
 			StoragePort.StoredResource stored = storagePort.get(audio.getStorageKey());
@@ -119,7 +163,8 @@ public class TranscriptionWorkflowService {
 			log.error("Transcription job failed for memo {}", memoId, exception);
 			transactionTemplate.executeWithoutResult(status -> {
 				VoiceMemo memo = findOwnedMemo(ownerId, memoId);
-				memo.markTranscriptionFailed();
+				FailureReason mapped = mapToFailureReason(exception);
+				memo.markTranscriptionFailed(mapped.code(), mapped.message(), mapped.retryable());
 			});
 		}
 	}
@@ -153,11 +198,18 @@ public class TranscriptionWorkflowService {
 		String text
 	) {}
 
+	public record FailureReasonDto(
+		String code,
+		String message,
+		boolean retryable
+	) {}
+
 	public record TranscriptionResponse(
 		String memoId,
 		String status,
 		String text,
 		List<SegmentDto> segments,
+		FailureReasonDto failureReason,
 		String updatedAt
 	) {
 		static TranscriptionResponse from(VoiceMemo memo, Transcript transcript, List<TranscriptSegment> segments) {
@@ -172,11 +224,20 @@ public class TranscriptionWorkflowService {
 					));
 				}
 			}
+			FailureReasonDto failureReasonDto = null;
+			if (memo.getTranscriptionStatus() == TranscriptionStatus.FAILED && memo.getFailureReasonCode() != null) {
+				failureReasonDto = new FailureReasonDto(
+					memo.getFailureReasonCode(),
+					memo.getFailureReasonMessage(),
+					Boolean.TRUE.equals(memo.getFailureReasonRetryable())
+				);
+			}
 			return new TranscriptionResponse(
 				memo.getId().toString(),
 				memo.getTranscriptionStatus().name(),
 				transcript == null ? null : transcript.getText(),
 				segmentDtos,
+				failureReasonDto,
 				(transcript == null || transcript.getUpdatedAt() == null) ? null : transcript.getUpdatedAt().toString()
 			);
 		}

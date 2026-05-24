@@ -20,12 +20,19 @@ export type MemoDetail = MemoSummary & {
   };
 };
 
+export type FailureReason = {
+  code: string;
+  message: string;
+  retryable: boolean;
+};
+
 export type TranscriptResponse = {
   memoId: string;
   status: string;
   text: string | null;
   updatedAt: string | null;
   segments: TranscriptSegment[];
+  failureReason: FailureReason | null;
 };
 
 export type TranscriptSegment = {

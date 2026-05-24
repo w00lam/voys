@@ -617,7 +617,9 @@ function App() {
                       )}
 
                       {transcript.status === 'ready' && transcript.transcript.status === 'FAILED' && (
-                        <p className="result failure">전사에 실패했습니다.</p>
+                        <p className="result failure">
+                          {transcript.transcript.failureReason?.message || '전사에 실패했습니다.'}
+                        </p>
                       )}
 
                       {transcript.status === 'ready'
