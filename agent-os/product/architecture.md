@@ -176,6 +176,7 @@ MVP recording constraints:
 - Transcription should run asynchronously after upload.
 - File size limits should be validated against 2-hour WebM/Opus recordings during implementation.
 - The UI should make long-running transcription status visible to the user.
+- The UI should show safe transcription failure reasons so users can distinguish setup, timeout, audio, and unexpected processing failures.
 - Transcript segments should include timestamps so search results can jump to the relevant point in the recording.
 - The memo detail view should support playing the original audio from a selected transcript timestamp.
 - MVP transcripts should be read-only. Human editing should be introduced later at the generated-document layer rather than as raw transcript/audio editing.
@@ -188,6 +189,7 @@ When integrations are added:
 - Design retries and idempotency for operations that can be safely repeated.
 - Treat audio upload, transcription, and transcript persistence as separately recoverable steps.
 - Store recording status separately from transcription status so failed transcription does not lose the original memo.
+- Store only safe transcription failure metadata for API/UI use; keep raw command output, stack traces, local paths, and full command details in logs only.
 
 ## Deployment
 
@@ -235,6 +237,7 @@ CI/CD should initially run:
 | 2026-05-20 | Use automatic temporary titles for the MVP | Accepted | Users can save quickly without waiting for title generation or full document processing. |
 | 2026-05-20 | Support timestamp-based audio verification | Accepted | Search results should help users verify the relevant moment without replaying long recordings. |
 | 2026-05-20 | Keep transcript editing out of the MVP | Accepted | Editing is more useful after generated documentation exists, not at the raw transcript/audio layer. |
+| 2026-05-24 | Add Phase 1.5 MVP stabilization before Phase 2 | Accepted | Stabilization should improve demo readiness, Whisper/Docker guidance, known issues, manual verification, and safe transcription failure reasons. |
 
 ## Open Questions
 

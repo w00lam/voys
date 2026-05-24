@@ -42,6 +42,20 @@ describe('App transcription polling', () => {
     expect(transcriptFetchCount(fetchMock)).toBeGreaterThanOrEqual(3);
   });
 
+  test('shows a safe transcription failure reason when transcription fails', async () => {
+    vi.stubGlobal('fetch', mockApi({ failTranscriptionStart: true }));
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
+    await screen.findByText('아직 생성된 전사 내용이 없습니다.');
+
+    fireEvent.click(screen.getByRole('button', { name: '전사 시작' }));
+
+    expect(await screen.findByText('Whisper CLI is not installed or not available to the backend process.')).toBeInTheDocument();
+    expect(document.querySelector('audio')).toBeInTheDocument();
+  });
+
   test('renders memo metadata separator without mojibake', async () => {
     vi.stubGlobal('fetch', mockApi());
 
@@ -189,7 +203,7 @@ function installMediaRecorderMock() {
   return recorder;
 }
 
-function mockApi() {
+function mockApi(options: { failTranscriptionStart?: boolean } = {}) {
   let transcriptReads = 0;
   let memoStatus = 'PENDING';
   let selectedTitle = 'Lecture about product strategy';
@@ -248,11 +262,29 @@ function mockApi() {
     }
 
     if (method === 'POST' && path === `/api/memos/${memoId}/transcription`) {
+      if (options.failTranscriptionStart) {
+        memoStatus = 'FAILED';
+        return jsonResponse({
+          memoId,
+          status: 'FAILED',
+          text: null,
+          segments: [],
+          failureReason: {
+            code: 'WHISPER_COMMAND_NOT_FOUND',
+            message: 'Whisper CLI is not installed or not available to the backend process.',
+            retryable: true,
+          },
+          updatedAt: '2026-05-24T09:45:00Z',
+        });
+      }
+
       memoStatus = 'PROCESSING';
       return jsonResponse({
         memoId,
         status: 'PROCESSING',
         text: null,
+        segments: [],
+        failureReason: null,
         updatedAt: null,
       });
     }
@@ -275,6 +307,8 @@ function mockApi() {
           memoId,
           status: 'COMPLETED',
           text: 'Final transcript text from the background worker.',
+          segments: [],
+          failureReason: null,
           updatedAt: '2026-05-21T10:01:00Z',
         });
       }
@@ -304,6 +338,7 @@ function mockApi() {
             text: 'roadmap and risks',
           },
         ],
+        failureReason: null,
         updatedAt: null,
       });
     }

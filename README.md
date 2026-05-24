@@ -122,6 +122,8 @@ http://localhost:3000
 ```
 
 The first run can take a while because Docker downloads base images and builds the backend image with Whisper, ffmpeg, and CPU-only Torch dependencies.
+The first transcription can also take a while because Whisper may download the configured model into the `whisper-cache` volume before processing audio.
+On slower machines, a long recording can remain in `PROCESSING` for several minutes.
 
 Stop the stack:
 
@@ -145,10 +147,25 @@ Important defaults:
 - `VOYS_STORAGE_ROOT=storage/audio`
 - `VOYS_FRONTEND_ORIGIN=http://localhost:5173`
 - `VOYS_WHISPER_COMMAND=whisper`
+- `VOYS_WHISPER_MODEL=tiny` in Docker Compose
 - `VOYS_WHISPER_OUTPUT_ROOT=storage/transcripts`
 - `VOYS_WHISPER_TIMEOUT_SECONDS=7200`
 
 Local audio and transcript output directories should stay out of Git.
+
+### Whisper Model And Quality Notes
+
+The Docker demo defaults to the `tiny` Whisper model so setup, first transcription, and short demos stay practical on CPU-only machines.
+This model is fast, but it can miss words, punctuation, speaker changes, proper nouns, Korean/English mixed speech, quiet audio, or noisy recordings.
+
+Use a larger model when quality matters more than speed:
+
+- `VOYS_WHISPER_MODEL=base` for better general accuracy with moderate CPU cost.
+- `VOYS_WHISPER_MODEL=small` for another quality step up with slower first runs and longer transcription time.
+
+The first run of a new model can be noticeably slower because the model must be downloaded and cached.
+Transcription speed depends heavily on CPU, memory, recording length, background load, and audio quality.
+The Phase 1 MVP does not yet show detailed failure reasons in the UI; see `agent-os/product/known-issues.md` for current limitations.
 
 ## Verification
 
@@ -170,6 +187,10 @@ cmd /c npm run build
 Manual MVP verification:
 
 - See `agent-os/product/mvp-verification.md`.
+
+Known MVP limitations:
+
+- See `agent-os/product/known-issues.md`.
 
 ## Product And Architecture Docs
 

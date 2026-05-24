@@ -16,6 +16,16 @@
 - Play the original audio from the relevant timestamp for quick verification.
 - Treat transcription as read-only in the MVP.
 
+## Phase 1.5: MVP Stabilization
+
+- Show safe, user-understandable transcription failure reasons instead of only a generic `FAILED` state.
+- Document Whisper model configuration, model quality tradeoffs, and local transcription limitations.
+- Explain that Docker first build, first model download, and first transcription can take a long time.
+- Improve long-recording transcription status UX so users understand that `PROCESSING` can last several minutes.
+- Maintain known issues for Docker, Whisper, browser support, long recordings, and transcription quality.
+- Strengthen the manual MVP verification checklist for shared local demos.
+- Collect early real-use feedback and turn it into candidate Phase 2 priorities.
+
 ## Phase 2: Post-Launch
 
 - Social login.
