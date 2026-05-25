@@ -447,3 +447,14 @@ button.danger {
 .segment-text {
   font-weight: normal;
 }
+
+.processing-guide {
+  border: 1px solid #d9dee7;
+  background: #f0f4f8;
+  color: #334e68;
+  padding: 14px 16px;
+  border-radius: 8px;
+  margin-top: 12px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
