@@ -628,6 +628,12 @@ function App() {
                         <p className="muted">아직 생성된 전사 내용이 없습니다.</p>
                       )}
 
+                      {transcript.status === 'ready' && transcript.transcript.status === 'PROCESSING' && (
+                        <p className="processing-guide">
+                          긴 녹음이나 첫 전사는 몇 분 이상 걸릴 수 있습니다.
+                        </p>
+                      )}
+
                       {transcript.status === 'failed' && (
                         <p className="result failure">{transcript.message}</p>
                       )}
