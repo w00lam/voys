@@ -10,6 +10,8 @@ Use this checklist before calling the Phase 1 MVP ready for a demo or broader ma
 - Frontend can reach backend APIs through the Vite `/api` proxy.
 - Local storage directories for audio and transcript output are outside Git.
 - Whisper CLI command is configured for the local machine.
+- The configured Whisper model is known before testing, especially when comparing speed and quality.
+- Docker users know the first build and first transcription can be slow because images, dependencies, and Whisper models may need to download.
 
 ## Automated Checks
 
@@ -46,6 +48,7 @@ cmd /c npm run build
 - Starting transcription changes the memo transcript status to `PROCESSING`.
 - Transcription continues in the background instead of blocking the HTTP request.
 - Polling updates the transcript status until `COMPLETED` or `FAILED`.
+- For a longer recording, `PROCESSING` remains visible and the memo/audio stay usable while transcription runs.
 - A completed transcript displays the full read-only transcript text.
 - Timestamped transcript segments display in position order.
 - Clicking a transcript segment seeks the audio to that timestamp without autoplay.
@@ -66,6 +69,7 @@ cmd /c npm run build
 - Browser recording stops automatically at the 2-hour limit.
 - Duplicate transcription starts are rejected while a memo is already processing.
 - Whisper failures mark the memo transcription as `FAILED` without deleting the original audio.
+- Whisper failures do not expose local filesystem paths, stack traces, or raw command output in the UI.
 - Search rejects blank queries.
 - Transcript and search views do not expose local filesystem paths.
 
@@ -83,5 +87,16 @@ cmd /c npm run build
 - Prepare at least one short test recording.
 - Prepare one recording with a known searchable phrase.
 - Confirm Whisper is available before the demo.
+- Confirm the selected Whisper model is appropriate for the demo goal: `tiny` for speed, `base` or `small` for better quality.
+- Run one short transcription before a demo when possible so Docker images, dependencies, and the selected Whisper model are already cached.
 - Confirm local storage has enough disk space for audio and transcript output.
 - Confirm backend and frontend logs do not show unexpected errors during the happy path.
+
+## Early Feedback Notes
+
+After a Phase 1 MVP demo, capture:
+
+- Whether users understood why transcription was pending, completed, or failed.
+- Whether transcript quality was acceptable for their audio and language mix.
+- Whether search results helped them jump back to useful audio moments.
+- Which Phase 2 candidates would make the MVP useful enough for repeated personal use.

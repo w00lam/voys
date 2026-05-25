@@ -49,6 +49,15 @@ public class VoiceMemo {
 	@Column(nullable = false)
 	private Instant updatedAt;
 
+	@Column(name = "failure_reason_code", length = 50)
+	private String failureReasonCode;
+
+	@Column(name = "failure_reason_message", length = 255)
+	private String failureReasonMessage;
+
+	@Column(name = "failure_reason_retryable")
+	private Boolean failureReasonRetryable;
+
 	protected VoiceMemo() {
 	}
 
@@ -97,6 +106,9 @@ public class VoiceMemo {
 
 	public void markTranscriptionProcessing() {
 		transcriptionStatus = TranscriptionStatus.PROCESSING;
+		failureReasonCode = null;
+		failureReasonMessage = null;
+		failureReasonRetryable = null;
 	}
 
 	public void markTranscriptionCompleted() {
@@ -105,6 +117,25 @@ public class VoiceMemo {
 
 	public void markTranscriptionFailed() {
 		transcriptionStatus = TranscriptionStatus.FAILED;
+	}
+
+	public void markTranscriptionFailed(String code, String message, boolean retryable) {
+		transcriptionStatus = TranscriptionStatus.FAILED;
+		this.failureReasonCode = code;
+		this.failureReasonMessage = message;
+		this.failureReasonRetryable = retryable;
+	}
+
+	public String getFailureReasonCode() {
+		return failureReasonCode;
+	}
+
+	public String getFailureReasonMessage() {
+		return failureReasonMessage;
+	}
+
+	public Boolean getFailureReasonRetryable() {
+		return failureReasonRetryable;
 	}
 
 	public Instant getCreatedAt() {
