@@ -56,6 +56,17 @@ describe('App transcription polling', () => {
     expect(document.querySelector('audio')).toBeInTheDocument();
   });
 
+  test('explains that long or first transcriptions can take several minutes while processing', async () => {
+    vi.stubGlobal('fetch', mockApi({ initialStatus: 'PROCESSING' }));
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
+
+    expect(await screen.findByText('긴 녹음이나 첫 전사는 몇 분 이상 걸릴 수 있습니다.')).toBeInTheDocument();
+    expect(document.querySelector('audio')).toBeInTheDocument();
+  });
+
   test('renders memo metadata separator without mojibake', async () => {
     vi.stubGlobal('fetch', mockApi());
 
@@ -203,9 +214,9 @@ function installMediaRecorderMock() {
   return recorder;
 }
 
-function mockApi(options: { failTranscriptionStart?: boolean } = {}) {
+function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: string } = {}) {
   let transcriptReads = 0;
-  let memoStatus = 'PENDING';
+  let memoStatus = options.initialStatus ?? 'PENDING';
   let selectedTitle = 'Lecture about product strategy';
 
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
