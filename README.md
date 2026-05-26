@@ -165,7 +165,8 @@ Use a larger model when quality matters more than speed:
 
 The first run of a new model can be noticeably slower because the model must be downloaded and cached.
 Transcription speed depends heavily on CPU, memory, recording length, background load, and audio quality.
-The Phase 1 MVP does not yet show detailed failure reasons in the UI; see `agent-os/product/known-issues.md` for current limitations.
+The Phase 1.5 MVP shows safe, user-understandable transcription failure reasons in the UI when common local Whisper problems occur. It still keeps raw command output, stack traces, local filesystem paths, and full environment details out of API responses and UI copy.
+See `agent-os/product/known-issues.md` for current MVP limitations.
 
 ## Verification
 

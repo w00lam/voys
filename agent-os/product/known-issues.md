@@ -4,8 +4,9 @@ Use this list when sharing the Phase 1 MVP for local demos or early feedback.
 
 ## Transcription Feedback
 
-- Transcription failure currently appears as a generic `FAILED` state.
-- The UI does not yet explain whether the failure came from a missing Whisper command, model download issue, timeout, invalid audio, empty output, or an unexpected backend error.
+- Phase 1.5 shows safe, user-understandable transcription failure reasons for common local Whisper failures.
+- Failure messages intentionally avoid raw command output, stack traces, local filesystem paths, and full environment details.
+- Some unexpected backend or environment failures may still be grouped into a generic unexpected processing message.
 - Original audio remains available after transcription failure.
 
 ## Whisper Model Quality
@@ -23,6 +24,7 @@ Use this list when sharing the Phase 1 MVP for local demos or early feedback.
 ## Long Recordings
 
 - The MVP allows recordings up to 2 hours, but long recordings can remain in `PROCESSING` for several minutes or longer on CPU-only machines.
+- Phase 1.5 adds processing copy so users know long recordings, Docker first runs, and first Whisper model downloads can take several minutes.
 - There is no detailed progress percentage for transcription yet.
 - If the backend container is stopped while a transcription job is running, the job may need to be started again after restart.
 
@@ -34,7 +36,7 @@ Use this list when sharing the Phase 1 MVP for local demos or early feedback.
 
 ## Phase 1.5 Follow-Up Candidates
 
-- Store and display safe transcription failure reasons.
-- Add clearer long-running transcription copy in the memo detail view.
-- Add a manual retry path once failure reasons are visible.
+- Add a manual retry path for failed transcriptions.
+- Add more detailed worker observability or progress signals if real demos show that `PROCESSING` copy is not enough.
 - Collect early user feedback before selecting Phase 2 items.
+- Decide whether Whisper model selection should remain environment-only or become visible in a later settings UI.
