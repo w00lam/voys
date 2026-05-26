@@ -69,6 +69,7 @@ cmd /c npm run build
 - Browser recording stops automatically at the 2-hour limit.
 - Duplicate transcription starts are rejected while a memo is already processing.
 - Whisper failures mark the memo transcription as `FAILED` without deleting the original audio.
+- Whisper failures show a safe user-understandable reason and practical next step when the backend can classify the cause.
 - Whisper failures do not expose local filesystem paths, stack traces, or raw command output in the UI.
 - Search rejects blank queries.
 - Transcript and search views do not expose local filesystem paths.
@@ -89,6 +90,7 @@ cmd /c npm run build
 - Confirm Whisper is available before the demo.
 - Confirm the selected Whisper model is appropriate for the demo goal: `tiny` for speed, `base` or `small` for better quality.
 - Run one short transcription before a demo when possible so Docker images, dependencies, and the selected Whisper model are already cached.
+- For Docker demos, tell testers that the first build, first model download, and first transcription may take noticeably longer than later runs.
 - Confirm local storage has enough disk space for audio and transcript output.
 - Confirm backend and frontend logs do not show unexpected errors during the happy path.
 
@@ -100,3 +102,4 @@ After a Phase 1 MVP demo, capture:
 - Whether transcript quality was acceptable for their audio and language mix.
 - Whether search results helped them jump back to useful audio moments.
 - Which Phase 2 candidates would make the MVP useful enough for repeated personal use.
+- Any setup confusion around Docker, Whisper model choice, first transcription time, browser support, or long recordings.
