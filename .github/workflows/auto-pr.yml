@@ -21,9 +21,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Open or update pull request
         id: pr
         uses: actions/github-script@v7
@@ -38,22 +35,21 @@ jobs:
             const branchLabel = `branch:${head}`;
             const issueMatch = head.match(/^(feature|fix|chore|docs|refactor|test)\/(\d+)[-_\/].+/);
             const linkedIssueNumber = issueMatch ? Number(issueMatch[2]) : null;
+            const branchType = head.split('/')[0];
             const readableTitle = head
               .replace(/^(feature|fix|chore|docs|refactor|test)\//, '')
               .replace(/^\d+[-_\/]/, '')
               .replace(/[-_]+/g, ' ')
               .replace(/\b\w/g, (char) => char.toUpperCase());
-            const branchType = head.split('/')[0];
             const typeLabels = {
-              feature: '기능',
-              fix: '수정',
-              chore: '작업',
-              docs: '문서',
-              refactor: '리팩터링',
-              test: '테스트',
+              feature: 'Feature',
+              fix: 'Fix',
+              chore: 'Chore',
+              docs: 'Docs',
+              refactor: 'Refactor',
+              test: 'Test',
             };
-            const koreanType = typeLabels[branchType] || '작업';
-            const generatedTitle = `${koreanType}: ${readableTitle}`;
+            const generatedTitle = `${typeLabels[branchType] || 'Work'}: ${readableTitle}`;
 
             async function ensureLabel(name, color, description) {
               try {
@@ -62,13 +58,7 @@ jobs:
                 if (error.status !== 404) {
                   throw error;
                 }
-                await github.rest.issues.createLabel({
-                  owner,
-                  repo,
-                  name,
-                  color,
-                  description,
-                });
+                await github.rest.issues.createLabel({ owner, repo, name, color, description });
               }
             }
 
@@ -98,7 +88,6 @@ jobs:
                 labels: branchLabel,
                 per_page: 10,
               });
-
               issue = issues.data.find((item) => !item.pull_request);
             }
 
@@ -109,24 +98,20 @@ jobs:
                 title: generatedTitle,
                 labels: [issueLabel, branchLabel],
                 body: [
-                  '## 목표',
+                  '## Goal',
                   '',
-                  `\`${head}\` 브랜치 작업을 추적합니다.`,
+                  `Track work for branch \`${head}\`.`,
                   '',
                   linkedIssueNumber
-                    ? `요청된 이슈 #${linkedIssueNumber}를 추적 이슈로 사용할 수 없어 fallback 이슈를 생성했습니다.`
-                    : '브랜치명에 이슈 번호가 없어 자동으로 생성된 추적 이슈입니다.',
+                    ? `Branch references issue #${linkedIssueNumber}, but it could not be used directly; this fallback issue was created.`
+                    : 'Branch name did not include an issue number, so this fallback tracking issue was created.',
                   '',
-                  '## 체크리스트',
+                  '## Checklist',
                   '',
-                  '- [ ] 필요한 경우 Agent OS spec이 연결되었거나 생성되었습니다.',
-                  '- [ ] 구현이 프로젝트 standards를 따릅니다.',
-                  '- [ ] 테스트 또는 수동 검증이 완료되었습니다.',
-                  '- [ ] merge 전에 PR 리뷰가 완료되었습니다.',
-                  '',
-                  '## 링크',
-                  '',
-                  '- PR: 브랜치 push 이후 자동 생성됩니다.',
+                  '- [ ] Agent OS spec is linked or created when needed.',
+                  '- [ ] Implementation follows project standards.',
+                  '- [ ] Tests or manual validation are complete.',
+                  '- [ ] PR review is complete before merge.',
                 ].join('\n'),
               });
               issue = createdIssue.data;
@@ -147,7 +132,10 @@ jobs:
               per_page: 100,
             });
 
-            const commitList = comparison.data.commits
+            const commits = comparison.data.commits || [];
+            const files = comparison.data.files || [];
+
+            const commitList = commits
               .slice(-10)
               .map((commit) => {
                 const message = commit.commit.message.split('\n')[0];
@@ -156,123 +144,62 @@ jobs:
               })
               .join('\n');
 
-            const fileList = (comparison.data.files || [])
+            const fileList = files
               .slice(0, 30)
-              .map((file) => {
-                const status = {
-                  added: '추가',
-                  modified: '수정',
-                  removed: '삭제',
-                  renamed: '이름 변경',
-                }[file.status] || file.status;
-                return `- \`${file.filename}\` (${status}, +${file.additions}/-${file.deletions})`;
-              })
+              .map((file) => `- \`${file.filename}\` (${file.status}, +${file.additions}/-${file.deletions})`)
               .join('\n');
 
-            const changedFiles = comparison.data.files || [];
-            const hasAutoPr = changedFiles.some((file) => file.filename === '.github/workflows/auto-pr.yml');
-            const hasBotReview = changedFiles.some((file) => file.filename === '.github/workflows/bot-review.yml');
-            const hasStartWork = changedFiles.some((file) => file.filename === '.github/workflows/start-work.yml');
-            const hasGitStandard = changedFiles.some((file) => file.filename === 'agent-os/standards/git/branching.md');
-            const hasBackend = changedFiles.some((file) => file.filename.startsWith('backend/'));
-            const hasFrontend = changedFiles.some((file) => file.filename.startsWith('frontend/'));
+            const hasBackend = files.some((file) => file.filename.startsWith('backend/'));
+            const hasFrontend = files.some((file) => file.filename.startsWith('frontend/'));
+            const hasWorkflow = files.some((file) => file.filename.startsWith('.github/workflows/'));
+            const hasAgentSpec = files.some((file) => file.filename.startsWith('agent-os/specs/'));
 
-            const changeSummary = [];
-            const reviewGuide = [];
-            const testGuide = [];
-
-            if (hasStartWork) {
-              changeSummary.push('- `Start Work` 수동 워크플로를 추가해 이슈를 먼저 만들고 이슈 번호가 포함된 작업 브랜치를 자동 생성합니다.');
-              reviewGuide.push('- `Start Work` 실행 시 `VOYS_REVIEW_TOKEN` 권한으로 이슈/라벨/브랜치가 생성되는지 확인합니다.');
-              reviewGuide.push('- 같은 slug를 다시 실행하거나 라벨이 없는 저장소에서 실행해도 실패하지 않는지 확인합니다.');
-            }
-
-            if (hasAutoPr) {
-              changeSummary.push('- 자동 PR 본문을 이슈, 브랜치, 변경 파일, 커밋 목록 중심으로 갱신해 작업 의도가 바로 보이게 합니다.');
-              reviewGuide.push('- 자동 PR 본문 갱신이 사용자가 직접 보완한 PR 내용을 의도치 않게 덮어쓰지 않는지 확인합니다.');
-              reviewGuide.push('- 브랜치명에 이슈 번호가 있는 경우 기존 이슈를 연결하고, 없는 경우 fallback 이슈를 만드는 흐름을 확인합니다.');
-            }
-
-            if (hasBotReview) {
-              changeSummary.push('- 자동 리뷰 코멘트를 하나의 워크플로로 모으고, 변경 파일 유형에 맞춘 리뷰 포커스를 남기도록 개선합니다.');
-              reviewGuide.push('- 자동 리뷰 코멘트가 push마다 중복으로 쌓이지 않고 이전 코멘트를 교체하는지 확인합니다.');
-              reviewGuide.push('- 리뷰 코멘트가 단순 체크리스트가 아니라 실제 확인해야 할 리스크를 충분히 드러내는지 확인합니다.');
-            }
-
-            if (hasGitStandard) {
-              changeSummary.push('- Git 브랜치/PR 전략 문서에 이슈 우선 작업 흐름과 자동화 사용 방식을 반영합니다.');
-            }
-
+            const validation = [];
             if (hasBackend) {
-              testGuide.push('- Backend CI 또는 `backend/gradlew.bat test` 결과를 확인합니다.');
+              validation.push('- Backend tests or CI Backend check.');
             }
-
             if (hasFrontend) {
-              testGuide.push('- Frontend CI 또는 `npm run build` 결과를 확인합니다.');
+              validation.push('- Frontend build/test or CI Frontend check.');
+            }
+            if (hasWorkflow) {
+              validation.push('- GitHub Actions workflow syntax and follow-up Actions run.');
+            }
+            if (validation.length === 0) {
+              validation.push('- Validation appropriate to this PR scope.');
             }
 
-            if (changedFiles.some((file) => file.filename.startsWith('.github/workflows/'))) {
-              testGuide.push('- GitHub Actions에서 `Auto PR`, `Bot Review`, `CI`가 각각 의도대로 실행되는지 확인합니다.');
-            }
-
-            const issueSummary = (issue.body || '')
-              .split('\n')
-              .map((line) => line.trim())
-              .filter((line) =>
-                line &&
-                !line.startsWith('## ') &&
-                !line.startsWith('- [ ]') &&
-                !line.startsWith('- PR:')
-              )
-              .slice(0, 12)
-              .join('\n');
-
-            const workGoal = [
-              `- ${readableTitle} 작업을 완료합니다.`,
-              issueSummary ? `- 이슈 내용: ${issueSummary.replace(/\n/g, ' / ')}` : '',
-            ].filter(Boolean).join('\n');
-
-            const title = generatedTitle;
             const body = [
-              '## 요약',
+              '## Summary',
               '',
               `- ${issue.title}`,
-              `- 브랜치: \`${head}\``,
+              `- Branch: \`${head}\``,
               `- Closes #${issue.number}`,
               '',
-              '## 작업 목표',
+              '## Changed Files',
               '',
-              workGoal,
+              fileList || '- No changed files detected yet.',
               '',
-              '## 이번 PR에서 하는 일',
+              '## Commits',
               '',
-              changeSummary.length > 0 ? changeSummary.join('\n') : '- 변경 파일과 커밋을 기준으로 작업 내용을 확인합니다.',
+              commitList || '- No commits detected yet.',
               '',
-              '## 리뷰할 때 볼 부분',
+              '## Review Focus',
               '',
-              reviewGuide.length > 0 ? reviewGuide.join('\n') : '- PR 본문, 변경 파일, 커밋 범위가 같은 작업을 설명하는지 확인합니다.',
+              hasAgentSpec
+                ? '- Confirm the implementation matches the Agent OS spec.'
+                : '- Confirm whether an Agent OS spec is unnecessary for this change.',
+              hasWorkflow
+                ? '- Confirm workflow permissions, triggers, and token usage are scoped correctly.'
+                : '- Confirm the diff matches the linked issue scope.',
               '',
-              '## 변경 파일',
+              '## Validation',
               '',
-              fileList || '- 아직 감지된 변경 파일이 없습니다.',
+              validation.join('\n'),
               '',
-              '## 커밋',
+              '## Notes',
               '',
-              commitList || '- 아직 감지된 커밋이 없습니다.',
-              '',
-              '## 검증',
-              '',
-              testGuide.length > 0 ? testGuide.join('\n') : '- PR 성격에 맞는 CI 또는 수동 검증을 확인합니다.',
-              '',
-              '## Agent OS',
-              '',
-              '- Spec:',
-              '- Standards:',
-              '',
-              '## 메모',
-              '',
-              '- 이 PR은 GitHub Actions가 자동으로 열었습니다.',
-              '- merge는 수동으로 진행합니다.',
+              '- This PR body was generated by GitHub Actions.',
+              '- Merge remains a manual or guarded automation decision.',
             ].join('\n');
 
             let pr;
@@ -282,14 +209,14 @@ jobs:
                 owner,
                 repo,
                 pull_number: pr.number,
-                title,
+                title: generatedTitle,
                 body,
               });
             } else {
               const created = await github.rest.pulls.create({
                 owner,
                 repo,
-                title,
+                title: generatedTitle,
                 head,
                 base,
                 body,
@@ -304,23 +231,11 @@ jobs:
               repo,
               issue_number: issue.number,
               body: [
-                '## 목표',
+                issue.body || '',
                 '',
-                `\`${head}\` 브랜치 작업을 추적합니다.`,
+                '## Links',
                 '',
-                linkedIssueNumber
-                  ? `이 브랜치는 이슈 #${linkedIssueNumber}와 연결되어 있습니다.`
-                  : '브랜치명에 이슈 번호가 없어 자동으로 생성된 추적 이슈입니다.',
-                '',
-                '## 체크리스트',
-                '',
-                '- [ ] 필요한 경우 Agent OS spec이 연결되었거나 생성되었습니다.',
-                '- [ ] 구현이 프로젝트 standards를 따릅니다.',
-                '- [ ] 테스트 또는 수동 검증이 완료되었습니다.',
-                '- [ ] merge 전에 PR 리뷰가 완료되었습니다.',
-                '',
-                '## 링크',
-                '',
+                `- Branch: \`${head}\``,
                 `- PR: #${pr.number}`,
               ].join('\n'),
             });
