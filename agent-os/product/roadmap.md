@@ -28,9 +28,15 @@
 
 ## Phase 2: Post-Launch
 
+- Phase 2A selected scope:
+  - Audio file upload for recordings captured outside the app.
+  - Manual memo title editing so users can name imported and browser-recorded memos.
+  - Reuse the existing transcription, transcript, search, timestamp jump, and playback workflows for imported audio.
+
+### Remaining Phase 2 Candidates
+
 - Social login.
 - Safari and broader browser audio format support.
-- Audio file upload for recordings captured outside the app.
 - Suggested titles after transcription completes.
 - Allowing users to keep, adopt, or edit suggested titles.
 - Tags, folders, or collections for organization.
