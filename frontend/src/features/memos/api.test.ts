@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { getTranscript, importAudioFile, updateMemoTitle } from './api';
+import { getTranscript, importAudioFile, listMemos, updateMemoFolder, updateMemoTitle } from './api';
 
 describe('memo api', () => {
   afterEach(() => {
@@ -39,6 +39,31 @@ describe('memo api', () => {
     }));
   });
 
+  test('updates memo folders through the memo metadata endpoint', async () => {
+    const fetchMock = installFetchMock();
+
+    await updateMemoFolder('33333333-3333-3333-3333-333333333333', 'Work');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/memos/33333333-3333-3333-3333-333333333333', expect.objectContaining({
+      method: 'PATCH',
+      credentials: 'include',
+      headers: expect.objectContaining({
+        'Content-Type': 'application/json',
+        'X-XSRF-TOKEN': 'csrf-token',
+      }),
+      body: JSON.stringify({ folder: 'Work' }),
+    }));
+  });
+
+  test('filters memo lists by folder', async () => {
+    const fetchMock = installFetchMock();
+
+    const memos = await listMemos('Work');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/memos?folder=Work', { credentials: 'include' });
+    expect(memos[0].folder).toBe('Work');
+  });
+
   test('reads suggested title from transcript responses', async () => {
     installFetchMock();
 
@@ -66,10 +91,27 @@ function installFetchMock() {
       }, 201);
     }
 
+    if ((init?.method ?? 'GET') === 'GET' && path === '/api/memos?folder=Work') {
+      return jsonResponse([
+        {
+          id: '33333333-3333-3333-3333-333333333333',
+          title: 'Product strategy sync',
+          folder: 'Work',
+          recordingStatus: 'UPLOADED',
+          transcriptionStatus: 'COMPLETED',
+          createdAt: '2026-05-27T12:00:00Z',
+          durationSeconds: 120,
+          audioSizeBytes: 4096,
+        },
+      ]);
+    }
+
     if ((init?.method ?? 'GET') === 'PATCH' && path === '/api/memos/33333333-3333-3333-3333-333333333333') {
+      const body = JSON.parse(String(init?.body));
       return jsonResponse({
         id: '33333333-3333-3333-3333-333333333333',
-        title: 'Product strategy sync',
+        title: body.title ?? 'Product strategy sync',
+        folder: body.folder ?? null,
       });
     }
 

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import com.voys.identity.application.UserPrincipal;
 import com.voys.memo.application.MemoLibraryService;
 
-class MemoControllerTitleUpdateTests {
+class MemoControllerFolderTests {
 
 	private static final UUID OWNER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 	private static final UUID MEMO_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
@@ -21,12 +22,22 @@ class MemoControllerTitleUpdateTests {
 	private final MemoController controller = new MemoController(memoLibraryService);
 
 	@Test
-	void updateMemoTitleUsesAuthenticatedUserAndRequestTitle() {
+	void listMemosPassesOptionalFolderFilter() {
+		UserPrincipal principal = new UserPrincipal(OWNER_ID, "user@example.com", "Voys User", "hash");
+		when(memoLibraryService.listMemos(OWNER_ID, "Work")).thenReturn(List.of());
+
+		assertThat(controller.listMemos(principal, "Work")).isEmpty();
+
+		verify(memoLibraryService).listMemos(OWNER_ID, "Work");
+	}
+
+	@Test
+	void updateMemoFolderUsesAuthenticatedUserAndRequestFolder() {
 		UserPrincipal principal = new UserPrincipal(OWNER_ID, "user@example.com", "Voys User", "hash");
 		MemoLibraryService.UpdateMemoMetadataCommand request =
-			new MemoLibraryService.UpdateMemoMetadataCommand("Product strategy sync", null);
+			new MemoLibraryService.UpdateMemoMetadataCommand(null, "Work");
 		MemoLibraryService.MemoMetadataUpdateResult expected =
-			new MemoLibraryService.MemoMetadataUpdateResult(MEMO_ID.toString(), "Product strategy sync", null);
+			new MemoLibraryService.MemoMetadataUpdateResult(MEMO_ID.toString(), "Lecture", "Work");
 		when(memoLibraryService.updateMetadata(OWNER_ID, MEMO_ID, request)).thenReturn(expected);
 
 		MemoLibraryService.MemoMetadataUpdateResult response = controller.updateMemo(principal, MEMO_ID, request);

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.voys.identity.application.UserPrincipal;
@@ -32,8 +33,11 @@ public class MemoController {
 	}
 
 	@GetMapping("/api/memos")
-	public List<MemoSummary> listMemos(@AuthenticationPrincipal UserPrincipal principal) {
-		return memoLibraryService.listMemos(principal.id());
+	public List<MemoSummary> listMemos(
+		@AuthenticationPrincipal UserPrincipal principal,
+		@RequestParam(required = false) String folder
+	) {
+		return memoLibraryService.listMemos(principal.id(), folder);
 	}
 
 	@GetMapping("/api/memos/{memoId}")
@@ -61,11 +65,11 @@ public class MemoController {
 	}
 
 	@PatchMapping("/api/memos/{memoId}")
-	public MemoLibraryService.MemoTitleUpdateResult updateMemo(
+	public MemoLibraryService.MemoMetadataUpdateResult updateMemo(
 		@AuthenticationPrincipal UserPrincipal principal,
 		@PathVariable UUID memoId,
-		@RequestBody MemoLibraryService.UpdateMemoTitleCommand request
+		@RequestBody MemoLibraryService.UpdateMemoMetadataCommand request
 	) {
-		return memoLibraryService.updateTitle(principal.id(), memoId, request);
+		return memoLibraryService.updateMetadata(principal.id(), memoId, request);
 	}
 }

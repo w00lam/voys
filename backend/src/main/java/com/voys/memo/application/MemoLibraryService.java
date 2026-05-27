@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.voys.memo.domain.InvalidMemoFolderException;
 import com.voys.memo.domain.InvalidMemoTitleException;
 import com.voys.memo.domain.MemoNotFoundException;
 import com.voys.memo.infrastructure.persistence.AudioAsset;
@@ -32,8 +33,18 @@ public class MemoLibraryService {
 
 	@Transactional(readOnly = true)
 	public List<MemoSummary> listMemos(UUID ownerId) {
-		return voiceMemoRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId)
-			.stream()
+		return listMemos(ownerId, null);
+	}
+
+	@Transactional(readOnly = true)
+	public List<MemoSummary> listMemos(UUID ownerId, String folder) {
+		List<VoiceMemo> memos;
+		if (folder != null && !folder.isBlank()) {
+			memos = voiceMemoRepository.findByOwnerIdAndFolderOrderByCreatedAtDesc(ownerId, folder);
+		} else {
+			memos = voiceMemoRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId);
+		}
+		return memos.stream()
 			.map(this::toSummary)
 			.toList();
 	}
@@ -71,6 +82,53 @@ public class MemoLibraryService {
 		return new MemoTitleUpdateResult(memo.getId() != null ? memo.getId().toString() : null, memo.getTitle());
 	}
 
+	@Transactional
+	public MemoMetadataUpdateResult updateMetadata(UUID ownerId, UUID memoId, UpdateMemoMetadataCommand command) {
+		if (command.hasFolder()) {
+			String folder = command.folder();
+			if (folder != null && !folder.trim().isEmpty()) {
+				folder = folder.trim();
+				if (folder.length() > 80) {
+					throw new InvalidMemoFolderException("Folder name cannot exceed 80 characters.");
+				}
+			}
+		}
+
+		if (command.hasTitle() && command.title() != null) {
+			String title = command.title();
+			if (title.trim().isEmpty()) {
+				throw new InvalidMemoTitleException("Title cannot be blank.");
+			}
+			title = title.trim();
+			if (title.length() > 200) {
+				throw new InvalidMemoTitleException("Title cannot exceed 200 characters.");
+			}
+		}
+
+		VoiceMemo memo = findOwnedMemo(ownerId, memoId);
+
+		if (command.hasTitle() && command.title() != null) {
+			memo.setTitle(command.title().trim());
+		}
+
+		if (command.hasFolder()) {
+			String folder = command.folder();
+			if (folder == null || folder.trim().isEmpty()) {
+				memo.setFolder(null);
+			} else {
+				memo.setFolder(folder.trim());
+			}
+		}
+
+		voiceMemoRepository.save(memo);
+
+		return new MemoMetadataUpdateResult(
+			memo.getId() != null ? memo.getId().toString() : null,
+			memo.getTitle(),
+			memo.getFolder()
+		);
+	}
+
 	private MemoSummary toSummary(VoiceMemo memo) {
 		AudioAsset audio = findAudio(memo.getId());
 		return MemoSummary.from(memo, audio);
@@ -89,6 +147,7 @@ public class MemoLibraryService {
 	public record MemoSummary(
 		String id,
 		String title,
+		String folder,
 		String recordingStatus,
 		String transcriptionStatus,
 		String createdAt,
@@ -99,9 +158,10 @@ public class MemoLibraryService {
 			return new MemoSummary(
 				memo.getId().toString(),
 				memo.getTitle(),
+				memo.getFolder(),
 				memo.getRecordingStatus().name(),
 				memo.getTranscriptionStatus().name(),
-				memo.getCreatedAt().toString(),
+				memo.getCreatedAt() != null ? memo.getCreatedAt().toString() : null,
 				audio.getDurationSeconds(),
 				audio.getSizeBytes()
 			);
@@ -111,6 +171,7 @@ public class MemoLibraryService {
 	public record MemoDetail(
 		String id,
 		String title,
+		String folder,
 		String recordingStatus,
 		String transcriptionStatus,
 		String createdAt,
@@ -121,10 +182,11 @@ public class MemoLibraryService {
 			return new MemoDetail(
 				memo.getId().toString(),
 				memo.getTitle(),
+				memo.getFolder(),
 				memo.getRecordingStatus().name(),
 				memo.getTranscriptionStatus().name(),
-				memo.getCreatedAt().toString(),
-				memo.getUpdatedAt().toString(),
+				memo.getCreatedAt() != null ? memo.getCreatedAt().toString() : null,
+				memo.getUpdatedAt() != null ? memo.getUpdatedAt().toString() : null,
 				AudioMetadata.from(audio)
 			);
 		}
@@ -156,4 +218,29 @@ public class MemoLibraryService {
 	public record UpdateMemoTitleCommand(String title) {}
 
 	public record MemoTitleUpdateResult(String id, String title) {}
+
+	public static class UpdateMemoMetadataCommand {
+		private String title;
+		private String folder;
+		private boolean hasTitle = false;
+		private boolean hasFolder = false;
+
+		public UpdateMemoMetadataCommand() {}
+
+		public UpdateMemoMetadataCommand(String title, String folder) {
+			this.title = title;
+			this.folder = folder;
+			this.hasTitle = true;
+			this.hasFolder = true;
+		}
+
+		public String title() { return title; }
+		public String folder() { return folder; }
+		public void setTitle(String title) { this.title = title; this.hasTitle = true; }
+		public void setFolder(String folder) { this.folder = folder; this.hasFolder = true; }
+		public boolean hasTitle() { return hasTitle; }
+		public boolean hasFolder() { return hasFolder; }
+	}
+
+	public record MemoMetadataUpdateResult(String id, String title, String folder) {}
 }
