@@ -65,6 +65,10 @@ export function startTranscription(id: string): Promise<TranscriptResponse> {
   return apiPost<TranscriptResponse, undefined>(`/api/memos/${id}/transcription`);
 }
 
+export function retryTranscription(id: string): Promise<TranscriptResponse> {
+  return apiPost<TranscriptResponse, undefined>(`/api/memos/${id}/transcription/retry`);
+}
+
 export type CreatedMemo = {
   id: string;
   title: string;

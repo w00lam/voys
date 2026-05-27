@@ -29,6 +29,14 @@ public class TranscriptionController {
 		return transcriptionWorkflowService.startTranscription(principal.id(), memoId);
 	}
 
+	@PostMapping("/api/memos/{memoId}/transcription/retry")
+	public TranscriptionResponse retryTranscription(
+		@AuthenticationPrincipal UserPrincipal principal,
+		@PathVariable UUID memoId
+	) {
+		return transcriptionWorkflowService.retryTranscription(principal.id(), memoId);
+	}
+
 	@GetMapping("/api/memos/{memoId}/transcript")
 	public TranscriptionResponse getTranscript(
 		@AuthenticationPrincipal UserPrincipal principal,

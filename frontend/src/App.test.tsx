@@ -56,6 +56,26 @@ describe('App transcription polling', () => {
     expect(document.querySelector('audio')).toBeInTheDocument();
   });
 
+  test('retries a failed transcription from the memo detail', async () => {
+    const fetchMock = mockApi({ failTranscriptionStart: true });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /전사 시작/i }));
+
+    expect(await screen.findByText('Whisper CLI is not installed or not available to the backend process.')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /retry transcription|try again/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`/api/memos/${memoId}/transcription/retry`, expect.objectContaining({
+        method: 'POST',
+      }));
+    });
+    expect(screen.queryByText('Whisper CLI is not installed or not available to the backend process.')).not.toBeInTheDocument();
+  });
+
   test('explains that long or first transcriptions can take several minutes while processing', async () => {
     vi.stubGlobal('fetch', mockApi({ initialStatus: 'PROCESSING' }));
 
@@ -458,6 +478,19 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
         memoId,
         status: 'PROCESSING',
         text: null,
+        segments: [],
+        failureReason: null,
+        updatedAt: null,
+      });
+    }
+
+    if (method === 'POST' && path === `/api/memos/${memoId}/transcription/retry`) {
+      memoStatus = 'PROCESSING';
+      return jsonResponse({
+        memoId,
+        status: 'PROCESSING',
+        text: null,
+        suggestedTitle: null,
         segments: [],
         failureReason: null,
         updatedAt: null,

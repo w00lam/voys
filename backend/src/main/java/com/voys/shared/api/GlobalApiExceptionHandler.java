@@ -20,6 +20,7 @@ import com.voys.notes.domain.GeneratedNoteNotReadyException;
 import com.voys.search.domain.InvalidSearchQueryException;
 import com.voys.transcription.domain.TranscriptionAlreadyRunningException;
 import com.voys.transcription.domain.TranscriptionFailedException;
+import com.voys.transcription.domain.TranscriptionRetryNotAllowedException;
 
 @RestControllerAdvice
 public class GlobalApiExceptionHandler {
@@ -73,6 +74,15 @@ public class GlobalApiExceptionHandler {
 	ResponseEntity<ApiErrorResponse> transcriptionAlreadyRunning(TranscriptionAlreadyRunningException exception) {
 		return ResponseEntity.status(HttpStatus.CONFLICT)
 			.body(new ApiErrorResponse("transcription.already_running", exception.getMessage()));
+	}
+
+	@ExceptionHandler(TranscriptionRetryNotAllowedException.class)
+	ResponseEntity<ApiErrorResponse> transcriptionRetryNotAllowed() {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+			.body(new ApiErrorResponse(
+				"transcription.retry_not_allowed",
+				"Transcription can be retried only after a failed attempt."
+			));
 	}
 
 	@ExceptionHandler(InvalidSearchQueryException.class)

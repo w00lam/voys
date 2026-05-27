@@ -8,6 +8,7 @@ import {
   getTranscript,
   importAudioFile,
   listMemos,
+  retryTranscription,
   updateMemoFolder,
   updateGeneratedNote,
   updateMemoTitle,
@@ -81,6 +82,19 @@ describe('memo api', () => {
     const transcript = await getTranscript('33333333-3333-3333-3333-333333333333');
 
     expect(transcript.suggestedTitle).toBe('Product strategy sync');
+  });
+
+  test('retries failed transcription through the retry endpoint', async () => {
+    const fetchMock = installFetchMock();
+
+    const transcript = await retryTranscription('33333333-3333-3333-3333-333333333333');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/memos/33333333-3333-3333-3333-333333333333/transcription/retry', expect.objectContaining({
+      method: 'POST',
+      credentials: 'include',
+    }));
+    expect(transcript.status).toBe('PROCESSING');
+    expect(transcript.failureReason).toBeNull();
   });
 
   test('generates memo notes through the generated-note endpoint', async () => {
@@ -190,6 +204,18 @@ function installFetchMock() {
         segments: [],
         failureReason: null,
         updatedAt: '2026-05-27T13:15:00Z',
+      });
+    }
+
+    if ((init?.method ?? 'GET') === 'POST' && path === '/api/memos/33333333-3333-3333-3333-333333333333/transcription/retry') {
+      return jsonResponse({
+        memoId: '33333333-3333-3333-3333-333333333333',
+        status: 'PROCESSING',
+        text: null,
+        suggestedTitle: null,
+        segments: [],
+        failureReason: null,
+        updatedAt: null,
       });
     }
 
