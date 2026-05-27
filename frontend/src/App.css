@@ -128,6 +128,51 @@ h1 {
   color: #687486;
 }
 
+.import-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e4e8ef;
+}
+
+.import-panel h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.import-panel p {
+  margin: 0;
+  color: #687486;
+}
+
+.import-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.import-controls label,
+.title-edit-container label {
+  display: grid;
+  gap: 7px;
+  color: #424b59;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.import-controls input,
+.title-edit-container input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cfd6e2;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #20242c;
+  font: inherit;
+}
+
 .library-panel {
   margin-top: 20px;
   padding-top: 20px;
@@ -193,6 +238,18 @@ h1 {
 
 .playback-panel audio {
   width: 100%;
+}
+
+.memo-header-pane {
+  display: grid;
+  gap: 8px;
+}
+
+.title-edit-container {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
 }
 
 .transcript-panel {
@@ -286,9 +343,12 @@ button.danger {
 
   .signed-in,
   .recorder-panel,
+  .import-controls,
   .library-heading,
-  .memo-list button {
+  .memo-list button,
+  .title-edit-container {
     align-items: stretch;
+    grid-template-columns: 1fr;
     flex-direction: column;
   }
 

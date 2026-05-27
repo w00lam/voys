@@ -174,6 +174,48 @@ describe('App transcription polling', () => {
       );
     });
   });
+
+  test('imports an existing audio file and refreshes the memo library', async () => {
+    const fetchMock = mockApi();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    const fileInput = await screen.findByLabelText(/audio file|오디오 파일|파일/i);
+    const file = new File(['audio'], 'team-sync.mp3', { type: 'audio/mpeg' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    fireEvent.click(screen.getByRole('button', { name: /import|가져오기|업로드/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/memos/audio-files', expect.objectContaining({
+        method: 'POST',
+      }));
+    });
+    expect(await screen.findByText('team sync')).toBeInTheDocument();
+  });
+
+  test('renames the selected memo title', async () => {
+    const fetchMock = mockApi();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
+    const titleInput = await screen.findByLabelText(/memo title|메모 제목|제목/i);
+
+    fireEvent.change(titleInput, { target: { value: 'Product strategy sync' } });
+    fireEvent.click(screen.getByRole('button', { name: /save title|저장/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`/api/memos/${memoId}`, expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ title: 'Product strategy sync' }),
+      }));
+    });
+    const renamedElements = await screen.findAllByText('Product strategy sync');
+    expect(renamedElements.length).toBeGreaterThan(0);
+  });
 });
 
 function installMediaRecorderMock() {
@@ -308,6 +350,25 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
         transcriptionStatus: 'PENDING',
         createdAt: '2026-05-22T10:00:00Z',
       }, 201);
+    }
+
+    if (method === 'POST' && path === '/api/memos/audio-files') {
+      selectedTitle = 'team sync';
+      return jsonResponse({
+        id: memoId,
+        title: 'team sync',
+        recordingStatus: 'UPLOADED',
+        transcriptionStatus: 'PENDING',
+        createdAt: '2026-05-27T12:00:00Z',
+      }, 201);
+    }
+
+    if (method === 'PATCH' && path === `/api/memos/${memoId}`) {
+      selectedTitle = JSON.parse(String(init?.body)).title;
+      return jsonResponse({
+        id: memoId,
+        title: selectedTitle,
+      });
     }
 
     if (method === 'GET' && path === `/api/memos/${memoId}/transcript`) {

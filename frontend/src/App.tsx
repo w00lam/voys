@@ -14,6 +14,8 @@ import {
   getTranscript,
   listMemos,
   startTranscription,
+  importAudioFile,
+  updateMemoTitle,
   type MemoDetail,
   type MemoSummary,
   type TranscriptResponse,
@@ -83,6 +85,12 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [search, setSearch] = useState<SearchState>({ status: 'idle' });
   const [pendingSeek, setPendingSeek] = useState<number | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [saveTitleError, setSaveTitleError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isStoppingRef = useRef(false);
 
@@ -377,6 +385,7 @@ function App() {
 
     setPlayback({ status: 'loading', memoId });
     setTranscript({ status: 'loading' });
+    setSaveTitleError(null);
 
     try {
       const [memo, audio, transcriptResult] = await Promise.all([
@@ -386,6 +395,7 @@ function App() {
       ]);
       setPlayback({ status: 'ready', memo, audioUrl: URL.createObjectURL(audio) });
       setTranscript({ status: 'ready', transcript: transcriptResult });
+      setEditingTitle(memo.title);
     } catch (error) {
       setPlayback({ status: 'failed', message: getErrorMessage(error) });
       setTranscript({ status: 'idle' });
@@ -408,6 +418,59 @@ function App() {
       await refreshMemos();
     }
   }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+      setImportError(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!selectedFile) return;
+    setIsImporting(true);
+    setImportError(null);
+    try {
+      await importAudioFile(selectedFile);
+      setSelectedFile(null);
+      const fileInput = document.getElementById('audio-file-input') as HTMLInputElement;
+      if (fileInput) {
+        fileInput.value = '';
+      }
+      await refreshMemos();
+    } catch (error) {
+      setImportError(getErrorMessage(error));
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleSaveTitle = async () => {
+    if (playback.status !== 'ready' || !editingTitle.trim()) return;
+    setIsSavingTitle(true);
+    setSaveTitleError(null);
+    const memoId = playback.memo.id;
+    try {
+      const updated = await updateMemoTitle(memoId, editingTitle);
+      setPlayback((prev) => {
+        if (prev.status === 'ready' && prev.memo.id === memoId) {
+          return {
+            ...prev,
+            memo: {
+              ...prev.memo,
+              title: updated.title,
+            },
+          };
+        }
+        return prev;
+      });
+      await refreshMemos();
+    } catch (error) {
+      setSaveTitleError(getErrorMessage(error));
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
 
   return (
     <main className="app-shell">
@@ -451,6 +514,30 @@ function App() {
                     {recorder.status === 'uploading' ? '업로드 중...' : '녹음 시작'}
                   </button>
                 )}
+              </div>
+
+              <div className="import-panel">
+                <div>
+                  <h2>오디오 파일 가져오기</h2>
+                  <p>기존 오디오 파일(MP3, WAV, WebM)을 가져와 라이브러리에 저장합니다.</p>
+                </div>
+                <div className="import-controls">
+                  <label htmlFor="audio-file-input">오디오 파일</label>
+                  <input
+                    id="audio-file-input"
+                    type="file"
+                    accept=".mp3,.wav,.webm,audio/*"
+                    onChange={handleFileChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleImport}
+                    disabled={isImporting || !selectedFile}
+                  >
+                    {isImporting ? '가져오는 중...' : '가져오기'}
+                  </button>
+                </div>
+                {importError && <p className="result failure">{importError}</p>}
               </div>
 
               {recorder.status === 'uploaded' && (
@@ -561,8 +648,25 @@ function App() {
 
                 {playback.status === 'ready' && (
                   <div className="playback-panel">
-                    <div>
+                    <div className="memo-header-pane">
                       <span className="label">선택한 메모</span>
+                      <div className="title-edit-container">
+                        <label htmlFor="memo-title-input">메모 제목</label>
+                        <input
+                          id="memo-title-input"
+                          type="text"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveTitle}
+                          disabled={isSavingTitle || !editingTitle.trim()}
+                        >
+                          {isSavingTitle ? '저장 중...' : '저장'}
+                        </button>
+                      </div>
+                      {saveTitleError && <p className="result failure">{saveTitleError}</p>}
                       <strong>{playback.memo.title}</strong>
                       <span className="muted">
                         {new Date(playback.memo.createdAt).toLocaleString()}

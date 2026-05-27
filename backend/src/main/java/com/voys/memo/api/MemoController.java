@@ -11,7 +11,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.voys.identity.application.UserPrincipal;
@@ -56,5 +58,14 @@ public class MemoController {
 			.cacheControl(CacheControl.noStore())
 			.header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().build().toString())
 			.body(audio.resource());
+	}
+
+	@PatchMapping("/api/memos/{memoId}")
+	public MemoLibraryService.MemoTitleUpdateResult updateMemo(
+		@AuthenticationPrincipal UserPrincipal principal,
+		@PathVariable UUID memoId,
+		@RequestBody MemoLibraryService.UpdateMemoTitleCommand request
+	) {
+		return memoLibraryService.updateTitle(principal.id(), memoId, request);
 	}
 }

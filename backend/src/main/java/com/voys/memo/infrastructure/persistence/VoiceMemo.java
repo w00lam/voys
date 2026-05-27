@@ -96,6 +96,10 @@ public class VoiceMemo {
 		return title;
 	}
 
+	public void setTitle(String title) {
+		this.title = title;
+	}
+
 	public RecordingStatus getRecordingStatus() {
 		return recordingStatus;
 	}
