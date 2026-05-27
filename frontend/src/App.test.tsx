@@ -225,7 +225,7 @@ describe('App transcription polling', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
 
-    expect(await screen.findByText(/Product strategy sync/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Product strategy sync/)).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: /추천 제목 사용|use suggested title/i }));
 
     await waitFor(() => {

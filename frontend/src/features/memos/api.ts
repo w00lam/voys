@@ -30,6 +30,7 @@ export type TranscriptResponse = {
   memoId: string;
   status: string;
   text: string | null;
+  suggestedTitle: string | null;
   updatedAt: string | null;
   segments: TranscriptSegment[];
   failureReason: FailureReason | null;

@@ -472,6 +472,34 @@ function App() {
     }
   };
 
+  const adoptSuggestedTitle = async (suggested: string) => {
+    if (playback.status !== 'ready' || !suggested.trim()) return;
+    setIsSavingTitle(true);
+    setSaveTitleError(null);
+    const memoId = playback.memo.id;
+    try {
+      const updated = await updateMemoTitle(memoId, suggested);
+      setPlayback((prev) => {
+        if (prev.status === 'ready' && prev.memo.id === memoId) {
+          return {
+            ...prev,
+            memo: {
+              ...prev.memo,
+              title: updated.title,
+            },
+          };
+        }
+        return prev;
+      });
+      setEditingTitle(updated.title);
+      await refreshMemos();
+    } catch (error) {
+      setSaveTitleError(getErrorMessage(error));
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
+
   return (
     <main className="app-shell">
       <section className="workspace">
@@ -666,6 +694,21 @@ function App() {
                           {isSavingTitle ? '저장 중...' : '저장'}
                         </button>
                       </div>
+                      {transcript.status === 'ready' && transcript.transcript.suggestedTitle && (
+                        <div className="suggested-title-box">
+                          <span className="suggested-title-text">
+                            추천 제목: <strong>{transcript.transcript.suggestedTitle}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            className="suggested-title-btn"
+                            onClick={() => adoptSuggestedTitle(transcript.transcript.suggestedTitle!)}
+                            disabled={isSavingTitle}
+                          >
+                            추천 제목 사용
+                          </button>
+                        </div>
+                      )}
                       {saveTitleError && <p className="result failure">{saveTitleError}</p>}
                       <strong>{playback.memo.title}</strong>
                       <span className="muted">
