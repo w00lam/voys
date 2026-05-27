@@ -235,6 +235,34 @@ describe('App transcription polling', () => {
       }));
     });
   });
+
+  test('assigns a folder and filters the memo library by folder', async () => {
+    const fetchMock = mockApi();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
+
+    const folderInput = await screen.findByLabelText(/memo folder|folder|폴더/i);
+    fireEvent.change(folderInput, { target: { value: 'Work' } });
+    fireEvent.click(screen.getByRole('button', { name: /save folder|폴더 저장|저장/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`/api/memos/${memoId}`, expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ folder: 'Work' }),
+      }));
+    });
+
+    const folderFilter = await screen.findByLabelText(/folder filter|filter by folder|폴더 필터/i);
+    fireEvent.change(folderFilter, { target: { value: 'Work' } });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/memos?folder=Work', { credentials: 'include' });
+    });
+    expect(await screen.findByText('Work')).toBeInTheDocument();
+  });
 });
 
 function installMediaRecorderMock() {
@@ -279,6 +307,7 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
   let transcriptReads = 0;
   let memoStatus = options.initialStatus ?? 'PENDING';
   let selectedTitle = 'Lecture about product strategy';
+  let selectedFolder: string | null = null;
 
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = typeof input === 'string' ? input : input.toString();
@@ -292,17 +321,19 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
       });
     }
 
-    if (method === 'GET' && path === '/api/memos') {
+    if (method === 'GET' && (path === '/api/memos' || path === '/api/memos?folder=Work')) {
+      const folderMatches = path === '/api/memos' || selectedFolder === 'Work';
       return jsonResponse([
-        {
+        ...(folderMatches ? [{
           id: memoId,
           title: selectedTitle,
+          folder: selectedFolder,
           recordingStatus: 'UPLOADED',
           transcriptionStatus: memoStatus,
           createdAt: '2026-05-21T10:00:00Z',
           durationSeconds: 120,
           audioSizeBytes: 5,
-        },
+        }] : []),
       ]);
     }
 
@@ -310,6 +341,7 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
       return jsonResponse({
         id: memoId,
         title: selectedTitle,
+        folder: selectedFolder,
         recordingStatus: 'UPLOADED',
         transcriptionStatus: memoStatus,
         createdAt: '2026-05-21T10:00:00Z',
@@ -383,10 +415,17 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
     }
 
     if (method === 'PATCH' && path === `/api/memos/${memoId}`) {
-      selectedTitle = JSON.parse(String(init?.body)).title;
+      const body = JSON.parse(String(init?.body));
+      if ('title' in body) {
+        selectedTitle = body.title;
+      }
+      if ('folder' in body) {
+        selectedFolder = body.folder?.trim() || null;
+      }
       return jsonResponse({
         id: memoId,
         title: selectedTitle,
+        folder: selectedFolder,
       });
     }
 
