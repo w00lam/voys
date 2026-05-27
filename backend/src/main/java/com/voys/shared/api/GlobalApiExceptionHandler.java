@@ -98,4 +98,10 @@ public class GlobalApiExceptionHandler {
 		return ResponseEntity.status(HttpStatus.CONFLICT)
 			.body(new ApiErrorResponse("note.not_ready", exception.getMessage()));
 	}
+
+	@ExceptionHandler(IllegalArgumentException.class)
+	ResponseEntity<ApiErrorResponse> illegalArgument(IllegalArgumentException exception) {
+		return ResponseEntity.badRequest()
+			.body(new ApiErrorResponse("note.invalid_argument", exception.getMessage()));
+	}
 }

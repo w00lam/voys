@@ -1,4 +1,4 @@
-import { apiGet, apiGetBlob, apiPost, apiPostForm, apiPatch } from '../../shared/api/client';
+import { apiGet, apiGetBlob, apiPost, apiPostForm, apiPatch, apiGetText } from '../../shared/api/client';
 
 export type MemoSummary = {
   id: string;
@@ -106,4 +106,22 @@ export function generateGeneratedNote(memoId: string): Promise<GeneratedNoteResp
 
 export function getGeneratedNote(memoId: string): Promise<GeneratedNoteResponse> {
   return apiGet<GeneratedNoteResponse>(`/api/memos/${memoId}/generated-note`);
+}
+
+export function updateGeneratedNote(
+  memoId: string,
+  updates: { summary: string; keyPoints: string[]; actionItems: string[] }
+): Promise<GeneratedNoteResponse> {
+  return apiPatch<GeneratedNoteResponse, { summary: string; keyPoints: string[]; actionItems: string[] }>(
+    `/api/memos/${memoId}/generated-note`,
+    updates
+  );
+}
+
+export function exportGeneratedNote(memoId: string): Promise<string> {
+  return apiGetText(`/api/memos/${memoId}/generated-note/export`);
+}
+
+export function exportTranscript(memoId: string): Promise<string> {
+  return apiGetText(`/api/memos/${memoId}/transcript/export`);
 }

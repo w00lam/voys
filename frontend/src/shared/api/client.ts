@@ -32,6 +32,18 @@ export async function apiGetBlob(path: string): Promise<Blob> {
   return response.blob();
 }
 
+export async function apiGetText(path: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  return response.text();
+}
+
 export async function apiPost<TResponse, TBody extends object | undefined = object>(
   path: string,
   body?: TBody,

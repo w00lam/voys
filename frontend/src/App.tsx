@@ -23,6 +23,9 @@ import {
   generateGeneratedNote,
   getGeneratedNote,
   type GeneratedNoteResponse,
+  updateGeneratedNote,
+  exportGeneratedNote,
+  exportTranscript,
 } from './features/memos/api';
 import { uploadRecording, type CreatedMemo } from './features/recorder/api';
 import { getErrorMessage } from './shared/api/client';
@@ -106,6 +109,11 @@ function App() {
   const [editingFolder, setEditingFolder] = useState('');
   const [isSavingFolder, setIsSavingFolder] = useState(false);
   const [saveFolderError, setSaveFolderError] = useState<string | null>(null);
+  const [editingSummary, setEditingSummary] = useState('');
+  const [editingKeyPoints, setEditingKeyPoints] = useState('');
+  const [editingActionItems, setEditingActionItems] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [saveNoteError, setSaveNoteError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isStoppingRef = useRef(false);
 
@@ -415,6 +423,10 @@ function App() {
       setPlayback({ status: 'ready', memo, audioUrl: URL.createObjectURL(audio) });
       setTranscript({ status: 'ready', transcript: transcriptResult });
       setGeneratedNote({ status: 'ready', note: noteResult });
+      setEditingSummary(noteResult.summary || '');
+      setEditingKeyPoints((noteResult.keyPoints || []).join('\n'));
+      setEditingActionItems((noteResult.actionItems || []).join('\n'));
+      setSaveNoteError(null);
       setEditingTitle(memo.title);
       setEditingFolder(memo.folder || '');
     } catch (error) {
@@ -451,6 +463,10 @@ function App() {
     try {
       const noteResult = await generateGeneratedNote(playback.memo.id);
       setGeneratedNote({ status: 'ready', note: noteResult });
+      setEditingSummary(noteResult.summary || '');
+      setEditingKeyPoints((noteResult.keyPoints || []).join('\n'));
+      setEditingActionItems((noteResult.actionItems || []).join('\n'));
+      setSaveNoteError(null);
     } catch (error) {
       setGeneratedNote({ status: 'failed', message: getErrorMessage(error) });
     }
@@ -568,6 +584,64 @@ function App() {
   const handleFilterFolderChange = async (folder: string) => {
     setSelectedFilterFolder(folder);
     await refreshMemos(folder);
+  };
+
+  const handleSaveNote = async () => {
+    if (playback.status !== 'ready') return;
+    setIsSavingNote(true);
+    setSaveNoteError(null);
+    const memoId = playback.memo.id;
+    try {
+      const updated = await updateGeneratedNote(memoId, {
+        summary: editingSummary,
+        keyPoints: editingKeyPoints.split('\n').map(p => p.trim()).filter(Boolean),
+        actionItems: editingActionItems.split('\n').map(p => p.trim()).filter(Boolean),
+      });
+      setGeneratedNote({ status: 'ready', note: updated });
+      setEditingSummary(updated.summary || '');
+      setEditingKeyPoints((updated.keyPoints || []).join('\n'));
+      setEditingActionItems((updated.actionItems || []).join('\n'));
+    } catch (error) {
+      setSaveNoteError(getErrorMessage(error));
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
+  const handleExportNote = async () => {
+    if (playback.status !== 'ready') return;
+    try {
+      const text = await exportGeneratedNote(playback.memo.id);
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `note-${playback.memo.title}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(`노트 내보내기 실패: ${getErrorMessage(error)}`);
+    }
+  };
+
+  const handleExportTranscript = async () => {
+    if (playback.status !== 'ready') return;
+    try {
+      const text = await exportTranscript(playback.memo.id);
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transcript-${playback.memo.title}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(`전사 내보내기 실패: ${getErrorMessage(error)}`);
+    }
   };
 
 
@@ -870,6 +944,17 @@ function App() {
                         <pre>{transcript.transcript.text}</pre>
                       )}
 
+                      {transcript.status === 'ready' && transcript.transcript.status === 'COMPLETED' && (
+                        <div className="transcript-actions">
+                          <button
+                            type="button"
+                            onClick={handleExportTranscript}
+                          >
+                            전사 내보내기
+                          </button>
+                        </div>
+                      )}
+
                       {transcript.status === 'ready' && transcript.transcript.segments && transcript.transcript.segments.length > 0 && (
                         <div className="transcript-segments">
                           {transcript.transcript.segments.map((segment) => (
@@ -929,34 +1014,52 @@ function App() {
 
                         {generatedNote.status === 'ready' && generatedNote.note.status === 'GENERATED' && (
                           <div className="generated-note-content">
-                            {generatedNote.note.summary && (
-                              <div className="note-section">
-                                <h3>요약</h3>
-                                <p>{generatedNote.note.summary}</p>
-                              </div>
-                            )}
+                            <div className="form-group">
+                              <label htmlFor="note-summary-input">노트 요약</label>
+                              <textarea
+                                id="note-summary-input"
+                                value={editingSummary}
+                                onChange={(e) => setEditingSummary(e.target.value)}
+                                placeholder="노트 요약 내용을 입력하세요..."
+                              />
+                            </div>
 
-                            {generatedNote.note.keyPoints && generatedNote.note.keyPoints.length > 0 && (
-                              <div className="note-section">
-                                <h3>주요 논점</h3>
-                                <ul>
-                                  {generatedNote.note.keyPoints.map((point, index) => (
-                                    <li key={index}>{point}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
+                            <div className="form-group">
+                              <label htmlFor="note-key-points-input">노트 주요 논점 (줄바꿈으로 구분)</label>
+                              <textarea
+                                id="note-key-points-input"
+                                value={editingKeyPoints}
+                                onChange={(e) => setEditingKeyPoints(e.target.value)}
+                                placeholder="주요 논점을 한 줄에 하나씩 입력하세요..."
+                              />
+                            </div>
 
-                            {generatedNote.note.actionItems && generatedNote.note.actionItems.length > 0 && (
-                              <div className="note-section">
-                                <h3>향후 계획</h3>
-                                <ul>
-                                  {generatedNote.note.actionItems.map((item, index) => (
-                                    <li key={index}>{item}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
+                            <div className="form-group">
+                              <label htmlFor="note-action-items-input">노트 향후 계획 (줄바꿈으로 구분)</label>
+                              <textarea
+                                id="note-action-items-input"
+                                value={editingActionItems}
+                                onChange={(e) => setEditingActionItems(e.target.value)}
+                                placeholder="향후 계획을 한 줄에 하나씩 입력하세요..."
+                              />
+                            </div>
+
+                            <div className="note-edit-actions">
+                              <button
+                                type="button"
+                                onClick={handleSaveNote}
+                                disabled={isSavingNote}
+                              >
+                                {isSavingNote ? '저장 중...' : '노트 저장'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleExportNote}
+                              >
+                                노트 내보내기
+                              </button>
+                            </div>
+                            {saveNoteError && <p className="result failure">{saveNoteError}</p>}
                           </div>
                         )}
 
