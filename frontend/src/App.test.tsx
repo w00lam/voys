@@ -216,6 +216,25 @@ describe('App transcription polling', () => {
     const renamedElements = await screen.findAllByText('Product strategy sync');
     expect(renamedElements.length).toBeGreaterThan(0);
   });
+
+  test('shows and adopts a suggested title after transcription completes', async () => {
+    const fetchMock = mockApi({ completedWithSuggestedTitle: true });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
+
+    expect(await screen.findByText(/Product strategy sync/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /추천 제목 사용|use suggested title/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`/api/memos/${memoId}`, expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ title: 'Product strategy sync' }),
+      }));
+    });
+  });
 });
 
 function installMediaRecorderMock() {
@@ -256,7 +275,7 @@ function installMediaRecorderMock() {
   return recorder;
 }
 
-function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: string } = {}) {
+function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: string; completedWithSuggestedTitle?: boolean } = {}) {
   let transcriptReads = 0;
   let memoStatus = options.initialStatus ?? 'PENDING';
   let selectedTitle = 'Lecture about product strategy';
@@ -372,6 +391,19 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
     }
 
     if (method === 'GET' && path === `/api/memos/${memoId}/transcript`) {
+      if (options.completedWithSuggestedTitle) {
+        memoStatus = 'COMPLETED';
+        return jsonResponse({
+          memoId,
+          status: 'COMPLETED',
+          text: 'Product strategy sync. The team discussed launch risks.',
+          suggestedTitle: 'Product strategy sync',
+          segments: [],
+          failureReason: null,
+          updatedAt: '2026-05-27T13:15:00Z',
+        });
+      }
+
       transcriptReads += 1;
       if (transcriptReads >= 3 && selectedTitle !== 'Strategy review') {
         memoStatus = 'COMPLETED';
