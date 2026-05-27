@@ -13,6 +13,7 @@ import {
   getMemoAudio,
   getTranscript,
   listMemos,
+  retryTranscription,
   startTranscription,
   importAudioFile,
   updateMemoTitle,
@@ -445,6 +446,23 @@ function App() {
 
     try {
       const transcriptResult = await startTranscription(playback.memo.id);
+      setTranscript({ status: 'ready', transcript: transcriptResult });
+      await refreshMemos();
+    } catch (error) {
+      setTranscript({ status: 'failed', message: getErrorMessage(error) });
+      await refreshMemos();
+    }
+  }
+
+  async function submitTranscriptionRetry() {
+    if (playback.status !== 'ready') {
+      return;
+    }
+
+    setTranscript({ status: 'loading' });
+
+    try {
+      const transcriptResult = await retryTranscription(playback.memo.id);
       setTranscript({ status: 'ready', transcript: transcriptResult });
       await refreshMemos();
     } catch (error) {
@@ -976,9 +994,14 @@ function App() {
                       )}
 
                       {transcript.status === 'ready' && transcript.transcript.status === 'FAILED' && (
+                        <>
                         <p className="result failure">
                           {transcript.transcript.failureReason?.message || '전사에 실패했습니다.'}
                         </p>
+                          <button type="button" aria-label="retry transcription" onClick={submitTranscriptionRetry}>
+                            다시 시도
+                          </button>
+                        </>
                       )}
 
                       {transcript.status === 'ready'

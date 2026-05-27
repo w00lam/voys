@@ -17,6 +17,7 @@ import com.voys.memo.infrastructure.persistence.AudioAssetRepository;
 import com.voys.memo.infrastructure.persistence.VoiceMemo;
 import com.voys.memo.infrastructure.persistence.VoiceMemoRepository;
 import com.voys.transcription.domain.TranscriptionAlreadyRunningException;
+import com.voys.transcription.domain.TranscriptionRetryNotAllowedException;
 import com.voys.transcription.infrastructure.persistence.Transcript;
 import com.voys.transcription.infrastructure.persistence.TranscriptRepository;
 import com.voys.transcription.infrastructure.persistence.TranscriptSegment;
@@ -61,6 +62,29 @@ public class TranscriptionWorkflowService {
 			VoiceMemo memo = findOwnedMemo(ownerId, memoId);
 			if (memo.getTranscriptionStatus() == TranscriptionStatus.PROCESSING) {
 				throw new TranscriptionAlreadyRunningException(memoId);
+			}
+			memo.markTranscriptionProcessing();
+			return findAudio(memoId);
+		});
+
+		transcriptionJobRunner.submit(() -> runTranscriptionJob(ownerId, memoId, audio));
+
+		return transactionTemplate.execute(status -> {
+			VoiceMemo memo = findOwnedMemo(ownerId, memoId);
+			Transcript transcript = transcriptRepository.findByMemoId(memoId).orElse(null);
+			List<TranscriptSegment> segments = List.of();
+			if (transcript != null) {
+				segments = transcriptSegmentRepository.findByTranscriptOrderByPositionAsc(transcript);
+			}
+			return TranscriptionResponse.from(memo, transcript, segments);
+		});
+	}
+
+	public TranscriptionResponse retryTranscription(UUID ownerId, UUID memoId) {
+		AudioAsset audio = transactionTemplate.execute(status -> {
+			VoiceMemo memo = findOwnedMemo(ownerId, memoId);
+			if (memo.getTranscriptionStatus() != TranscriptionStatus.FAILED) {
+				throw new TranscriptionRetryNotAllowedException(memoId, memo.getTranscriptionStatus().name());
 			}
 			memo.markTranscriptionProcessing();
 			return findAudio(memoId);
