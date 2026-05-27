@@ -263,6 +263,25 @@ describe('App transcription polling', () => {
     });
     expect((await screen.findAllByText('Work')).length).toBeGreaterThan(0);
   });
+
+  test('generates and renders a draft note for a completed transcript', async () => {
+    const fetchMock = mockApi({ initialStatus: 'COMPLETED' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /generate note|노트 생성|생성 노트/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`/api/memos/${memoId}/generated-note`, expect.objectContaining({
+        method: 'POST',
+      }));
+    });
+    expect(await screen.findByText('The team reviewed launch strategy.')).toBeInTheDocument();
+    expect(screen.getByText('Launch risks')).toBeInTheDocument();
+    expect(screen.getByText('Follow up on owners')).toBeInTheDocument();
+  });
 });
 
 function installMediaRecorderMock() {
@@ -308,6 +327,23 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
   let memoStatus = options.initialStatus ?? 'PENDING';
   let selectedTitle = 'Lecture about product strategy';
   let selectedFolder: string | null = null;
+  let generatedNote: {
+    memoId: string;
+    status: string;
+    summary: string | null;
+    keyPoints: string[];
+    actionItems: string[];
+    failureReason: null;
+    updatedAt: string | null;
+  } = {
+    memoId,
+    status: 'NOT_GENERATED',
+    summary: null,
+    keyPoints: [],
+    actionItems: [],
+    failureReason: null,
+    updatedAt: null,
+  };
 
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = typeof input === 'string' ? input : input.toString();
@@ -484,6 +520,23 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
         failureReason: null,
         updatedAt: null,
       });
+    }
+
+    if (method === 'GET' && path === `/api/memos/${memoId}/generated-note`) {
+      return jsonResponse(generatedNote);
+    }
+
+    if (method === 'POST' && path === `/api/memos/${memoId}/generated-note`) {
+      generatedNote = {
+        memoId,
+        status: 'GENERATED',
+        summary: 'The team reviewed launch strategy.',
+        keyPoints: ['Launch risks'],
+        actionItems: ['Follow up on owners'],
+        failureReason: null,
+        updatedAt: '2026-05-27T15:30:00Z',
+      };
+      return jsonResponse(generatedNote);
     }
 
     if (method === 'GET' && path === '/api/search?q=strategy') {
