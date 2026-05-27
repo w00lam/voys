@@ -58,6 +58,9 @@ public class VoiceMemo {
 	@Column(name = "failure_reason_retryable")
 	private Boolean failureReasonRetryable;
 
+	@Column(name = "suggested_title", length = 200)
+	private String suggestedTitle;
+
 	protected VoiceMemo() {
 	}
 
@@ -140,6 +143,14 @@ public class VoiceMemo {
 
 	public Boolean getFailureReasonRetryable() {
 		return failureReasonRetryable;
+	}
+
+	public String getSuggestedTitle() {
+		return suggestedTitle;
+	}
+
+	public void setSuggestedTitle(String suggestedTitle) {
+		this.suggestedTitle = suggestedTitle;
 	}
 
 	public Instant getCreatedAt() {

@@ -157,6 +157,8 @@ public class TranscriptionWorkflowService {
 					transcriptSegmentRepository.saveAll(segmentsToSave);
 				}
 
+				String suggestedTitle = deriveSuggestedTitle(result.text());
+				memo.setSuggestedTitle(suggestedTitle);
 				memo.markTranscriptionCompleted();
 			});
 		} catch (RuntimeException exception) {
@@ -179,6 +181,39 @@ public class TranscriptionWorkflowService {
 			}
 			return TranscriptionResponse.from(memo, transcript, segments);
 		});
+	}
+
+	private String deriveSuggestedTitle(String text) {
+		if (text == null || text.trim().isEmpty()) {
+			return null;
+		}
+		String[] parts = text.split("[.?!\\n]");
+		String firstPart = null;
+		for (String part : parts) {
+			if (part != null && !part.trim().isEmpty()) {
+				firstPart = part.trim();
+				break;
+			}
+		}
+		if (firstPart == null) {
+			return null;
+		}
+
+		while (!firstPart.isEmpty() && isTerminalPunctuation(firstPart.charAt(firstPart.length() - 1))) {
+			firstPart = firstPart.substring(0, firstPart.length() - 1).trim();
+		}
+
+		firstPart = firstPart.replaceAll("\\s+", " ");
+
+		if (firstPart.length() > 200) {
+			firstPart = firstPart.substring(0, 200).trim();
+		}
+
+		return firstPart.isEmpty() ? null : firstPart;
+	}
+
+	private boolean isTerminalPunctuation(char c) {
+		return c == '.' || c == '?' || c == '!' || c == ',' || c == ';' || c == ':';
 	}
 
 	private VoiceMemo findOwnedMemo(UUID ownerId, UUID memoId) {
@@ -208,6 +243,7 @@ public class TranscriptionWorkflowService {
 		String memoId,
 		String status,
 		String text,
+		String suggestedTitle,
 		List<SegmentDto> segments,
 		FailureReasonDto failureReason,
 		String updatedAt
@@ -236,6 +272,7 @@ public class TranscriptionWorkflowService {
 				memo.getId().toString(),
 				memo.getTranscriptionStatus().name(),
 				transcript == null ? null : transcript.getText(),
+				memo.getSuggestedTitle(),
 				segmentDtos,
 				failureReasonDto,
 				(transcript == null || transcript.getUpdatedAt() == null) ? null : transcript.getUpdatedAt().toString()

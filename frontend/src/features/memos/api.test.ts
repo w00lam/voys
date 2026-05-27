@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { importAudioFile, updateMemoTitle } from './api';
+import { getTranscript, importAudioFile, updateMemoTitle } from './api';
 
 describe('memo api', () => {
   afterEach(() => {
@@ -38,6 +38,14 @@ describe('memo api', () => {
       body: JSON.stringify({ title: 'Product strategy sync' }),
     }));
   });
+
+  test('reads suggested title from transcript responses', async () => {
+    installFetchMock();
+
+    const transcript = await getTranscript('33333333-3333-3333-3333-333333333333');
+
+    expect(transcript.suggestedTitle).toBe('Product strategy sync');
+  });
 });
 
 function installFetchMock() {
@@ -62,6 +70,18 @@ function installFetchMock() {
       return jsonResponse({
         id: '33333333-3333-3333-3333-333333333333',
         title: 'Product strategy sync',
+      });
+    }
+
+    if ((init?.method ?? 'GET') === 'GET' && path === '/api/memos/33333333-3333-3333-3333-333333333333/transcript') {
+      return jsonResponse({
+        memoId: '33333333-3333-3333-3333-333333333333',
+        status: 'COMPLETED',
+        text: 'Product strategy sync. The team discussed launch risks.',
+        suggestedTitle: 'Product strategy sync',
+        segments: [],
+        failureReason: null,
+        updatedAt: '2026-05-27T13:15:00Z',
       });
     }
 
