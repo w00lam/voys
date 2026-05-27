@@ -2,6 +2,7 @@ package com.voys.notes.application;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -74,6 +75,84 @@ public class GeneratedNoteService {
 		return generatedNoteRepository.findById(memoId)
 			.map(this::toResponse)
 			.orElseGet(() -> defaultResponse(memoId));
+	}
+
+	@Transactional
+	public GeneratedNoteResponse updateGeneratedNote(UUID ownerId, UUID memoId, UpdateGeneratedNoteCommand command) {
+		if (command.summary() == null || command.summary().trim().isEmpty()) {
+			throw new IllegalArgumentException("Summary cannot be blank.");
+		}
+
+		voiceMemoRepository.findByIdAndOwnerId(memoId, ownerId)
+			.orElseThrow(() -> new MemoNotFoundException(memoId));
+
+		GeneratedNote existing = generatedNoteRepository.findById(memoId)
+			.orElseThrow(() -> new GeneratedNoteNotReadyException(memoId));
+
+		existing.update(
+			command.summary().trim(),
+			normalizeLineList(command.keyPoints()),
+			normalizeLineList(command.actionItems())
+		);
+		GeneratedNote saved = generatedNoteRepository.save(existing);
+		return toResponse(saved);
+	}
+
+	@Transactional(readOnly = true)
+	public String exportGeneratedNote(UUID ownerId, UUID memoId) {
+		voiceMemoRepository.findByIdAndOwnerId(memoId, ownerId)
+			.orElseThrow(() -> new MemoNotFoundException(memoId));
+
+		GeneratedNote note = generatedNoteRepository.findById(memoId)
+			.orElseThrow(() -> new GeneratedNoteNotReadyException(memoId));
+
+		StringBuilder sb = new StringBuilder();
+		sb.append("Summary\n");
+		if (note.getSummary() != null) {
+			sb.append(note.getSummary()).append("\n");
+		}
+		sb.append("\nKey Points\n");
+		if (note.getKeyPoints() != null) {
+			for (String point : note.getKeyPoints()) {
+				sb.append("- ").append(point).append("\n");
+			}
+		}
+		sb.append("\nAction Items\n");
+		if (note.getActionItems() != null) {
+			for (String item : note.getActionItems()) {
+				sb.append("- ").append(item).append("\n");
+			}
+		}
+		return sb.toString();
+	}
+
+	@Transactional(readOnly = true)
+	public String exportTranscript(UUID ownerId, UUID memoId) {
+		voiceMemoRepository.findByIdAndOwnerId(memoId, ownerId)
+			.orElseThrow(() -> new MemoNotFoundException(memoId));
+
+		Transcript transcript = transcriptRepository.findByMemoId(memoId)
+			.orElseThrow(() -> new GeneratedNoteNotReadyException(memoId));
+
+		return transcript.getText();
+	}
+
+	public record UpdateGeneratedNoteCommand(
+		String summary,
+		List<String> keyPoints,
+		List<String> actionItems
+	) {}
+
+	private List<String> normalizeLineList(List<String> values) {
+		if (values == null) {
+			return List.of();
+		}
+
+		return values.stream()
+			.filter(Objects::nonNull)
+			.map(String::trim)
+			.filter(value -> !value.isEmpty())
+			.toList();
 	}
 
 	private GeneratedNoteResponse toResponse(GeneratedNote note) {

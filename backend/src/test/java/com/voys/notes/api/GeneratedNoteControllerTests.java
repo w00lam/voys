@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 
 import com.voys.identity.application.UserPrincipal;
 import com.voys.notes.application.GeneratedNoteService;
@@ -41,6 +43,43 @@ class GeneratedNoteControllerTests {
 		assertThat(controller.getGeneratedNote(principal, MEMO_ID)).isEqualTo(expected);
 
 		verify(generatedNoteService).getGeneratedNote(OWNER_ID, MEMO_ID);
+	}
+
+	@Test
+	void updateNoteUsesAuthenticatedOwnerAndRequestBody() {
+		UserPrincipal principal = new UserPrincipal(OWNER_ID, "user@example.com", "Voys User", "hash");
+		GeneratedNoteService.UpdateGeneratedNoteCommand request =
+			new GeneratedNoteService.UpdateGeneratedNoteCommand("Edited", List.of("Point"), List.of("Action"));
+		GeneratedNoteService.GeneratedNoteResponse expected = response();
+		when(generatedNoteService.updateGeneratedNote(OWNER_ID, MEMO_ID, request)).thenReturn(expected);
+
+		assertThat(controller.updateGeneratedNote(principal, MEMO_ID, request)).isEqualTo(expected);
+
+		verify(generatedNoteService).updateGeneratedNote(OWNER_ID, MEMO_ID, request);
+	}
+
+	@Test
+	void exportGeneratedNoteReturnsPlainTextResponse() {
+		UserPrincipal principal = new UserPrincipal(OWNER_ID, "user@example.com", "Voys User", "hash");
+		when(generatedNoteService.exportGeneratedNote(OWNER_ID, MEMO_ID)).thenReturn("Summary\nEdited");
+
+		ResponseEntity<String> response = controller.exportGeneratedNote(principal, MEMO_ID);
+
+		assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.TEXT_PLAIN);
+		assertThat(response.getBody()).isEqualTo("Summary\nEdited");
+		verify(generatedNoteService).exportGeneratedNote(OWNER_ID, MEMO_ID);
+	}
+
+	@Test
+	void exportTranscriptReturnsPlainTextResponse() {
+		UserPrincipal principal = new UserPrincipal(OWNER_ID, "user@example.com", "Voys User", "hash");
+		when(generatedNoteService.exportTranscript(OWNER_ID, MEMO_ID)).thenReturn("Transcript text");
+
+		ResponseEntity<String> response = controller.exportTranscript(principal, MEMO_ID);
+
+		assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.TEXT_PLAIN);
+		assertThat(response.getBody()).isEqualTo("Transcript text");
+		verify(generatedNoteService).exportTranscript(OWNER_ID, MEMO_ID);
 	}
 
 	private GeneratedNoteService.GeneratedNoteResponse response() {

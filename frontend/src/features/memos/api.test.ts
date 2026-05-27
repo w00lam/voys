@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
+  exportGeneratedNote,
+  exportTranscript,
   generateGeneratedNote,
   getGeneratedNote,
   getTranscript,
   importAudioFile,
   listMemos,
   updateMemoFolder,
+  updateGeneratedNote,
   updateMemoTitle,
 } from './api';
 
@@ -102,6 +105,38 @@ describe('memo api', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/memos/33333333-3333-3333-3333-333333333333/generated-note', { credentials: 'include' });
     expect(note.status).toBe('GENERATED');
   });
+
+  test('updates generated notes through the generated-note endpoint', async () => {
+    const fetchMock = installFetchMock();
+
+    await updateGeneratedNote('33333333-3333-3333-3333-333333333333', {
+      summary: 'Edited summary',
+      keyPoints: ['Edited point'],
+      actionItems: ['Edited action'],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/memos/33333333-3333-3333-3333-333333333333/generated-note', expect.objectContaining({
+      method: 'PATCH',
+      credentials: 'include',
+      body: JSON.stringify({
+        summary: 'Edited summary',
+        keyPoints: ['Edited point'],
+        actionItems: ['Edited action'],
+      }),
+    }));
+  });
+
+  test('exports generated notes and transcripts as text', async () => {
+    const fetchMock = installFetchMock();
+
+    const noteExport = await exportGeneratedNote('33333333-3333-3333-3333-333333333333');
+    const transcriptExport = await exportTranscript('33333333-3333-3333-3333-333333333333');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/memos/33333333-3333-3333-3333-333333333333/generated-note/export', { credentials: 'include' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/memos/33333333-3333-3333-3333-333333333333/transcript/export', { credentials: 'include' });
+    expect(noteExport).toContain('Edited summary');
+    expect(transcriptExport).toContain('Product strategy sync');
+  });
 });
 
 function installFetchMock() {
@@ -162,8 +197,23 @@ function installFetchMock() {
       return jsonResponse(generatedNote());
     }
 
+    if ((init?.method ?? 'GET') === 'PATCH' && path === '/api/memos/33333333-3333-3333-3333-333333333333/generated-note') {
+      return jsonResponse({
+        ...generatedNote(),
+        ...JSON.parse(String(init?.body)),
+      });
+    }
+
     if ((init?.method ?? 'GET') === 'GET' && path === '/api/memos/33333333-3333-3333-3333-333333333333/generated-note') {
       return jsonResponse(generatedNote());
+    }
+
+    if ((init?.method ?? 'GET') === 'GET' && path === '/api/memos/33333333-3333-3333-3333-333333333333/generated-note/export') {
+      return textResponse('Summary\nEdited summary');
+    }
+
+    if ((init?.method ?? 'GET') === 'GET' && path === '/api/memos/33333333-3333-3333-3333-333333333333/transcript/export') {
+      return textResponse('Product strategy sync. The team discussed launch risks.');
     }
 
     return jsonResponse({ code: 'test.not_found', message: `${init?.method ?? 'GET'} ${path}` }, 404);
@@ -171,6 +221,15 @@ function installFetchMock() {
 
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
+}
+
+function textResponse(body: string, status = 200) {
+  return new Response(body, {
+    status,
+    headers: {
+      'Content-Type': 'text/plain; charset=UTF-8',
+    },
+  });
 }
 
 function generatedNote() {

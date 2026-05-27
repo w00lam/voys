@@ -83,4 +83,11 @@ public class GeneratedNote {
 	public Instant getUpdatedAt() {
 		return updatedAt;
 	}
+
+	public void update(String summary, List<String> keyPoints, List<String> actionItems) {
+		this.summary = summary;
+		this.keyPoints = List.copyOf(keyPoints);
+		this.actionItems = List.copyOf(actionItems);
+		this.updatedAt = Instant.now();
+	}
 }

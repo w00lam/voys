@@ -91,6 +91,84 @@ class GeneratedNoteServiceTests {
 		verifyNoInteractions(generatedNoteRepository, generator);
 	}
 
+	@Test
+	void updateGeneratedNoteReplacesEditableFieldsWithoutChangingTranscript() {
+		VoiceMemo memo = completedMemo();
+		Transcript transcript = Transcript.create(memo, "Original transcript text.");
+		GeneratedNote existing = new GeneratedNote(
+			MEMO_ID,
+			"GENERATED",
+			"Original summary",
+			List.of("Original point"),
+			List.of("Original action"),
+			null,
+			null
+		);
+		when(voiceMemoRepository.findByIdAndOwnerId(MEMO_ID, OWNER_ID)).thenReturn(Optional.of(memo));
+		when(generatedNoteRepository.findById(MEMO_ID)).thenReturn(Optional.of(existing));
+		when(transcriptRepository.findByMemoId(MEMO_ID)).thenReturn(Optional.of(transcript));
+		when(generatedNoteRepository.save(any(GeneratedNote.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		GeneratedNoteService.GeneratedNoteResponse response = service.updateGeneratedNote(
+			OWNER_ID,
+			MEMO_ID,
+			new GeneratedNoteService.UpdateGeneratedNoteCommand(
+				"Edited summary",
+				List.of("Edited point"),
+				List.of("Edited action")
+			)
+		);
+
+		assertThat(response.summary()).isEqualTo("Edited summary");
+		assertThat(response.keyPoints()).containsExactly("Edited point");
+		assertThat(response.actionItems()).containsExactly("Edited action");
+		assertThat(transcript.getText()).isEqualTo("Original transcript text.");
+	}
+
+	@Test
+	void updateGeneratedNoteRejectsBlankSummary() {
+		VoiceMemo memo = completedMemo();
+		when(voiceMemoRepository.findByIdAndOwnerId(MEMO_ID, OWNER_ID)).thenReturn(Optional.of(memo));
+
+		assertThatThrownBy(() -> service.updateGeneratedNote(
+			OWNER_ID,
+			MEMO_ID,
+			new GeneratedNoteService.UpdateGeneratedNoteCommand("  ", List.of(), List.of())
+		))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("Summary");
+	}
+
+	@Test
+	void exportGeneratedNoteReturnsReadablePlainText() {
+		VoiceMemo memo = completedMemo();
+		GeneratedNote existing = new GeneratedNote(
+			MEMO_ID,
+			"GENERATED",
+			"Edited summary",
+			List.of("Edited point"),
+			List.of("Edited action"),
+			null,
+			null
+		);
+		when(voiceMemoRepository.findByIdAndOwnerId(MEMO_ID, OWNER_ID)).thenReturn(Optional.of(memo));
+		when(generatedNoteRepository.findById(MEMO_ID)).thenReturn(Optional.of(existing));
+
+		String exported = service.exportGeneratedNote(OWNER_ID, MEMO_ID);
+
+		assertThat(exported).contains("Summary", "Edited summary", "Key Points", "Edited point", "Action Items", "Edited action");
+	}
+
+	@Test
+	void exportTranscriptReturnsRawTranscriptText() {
+		VoiceMemo memo = completedMemo();
+		Transcript transcript = Transcript.create(memo, "Original transcript text.");
+		when(voiceMemoRepository.findByIdAndOwnerId(MEMO_ID, OWNER_ID)).thenReturn(Optional.of(memo));
+		when(transcriptRepository.findByMemoId(MEMO_ID)).thenReturn(Optional.of(transcript));
+
+		assertThat(service.exportTranscript(OWNER_ID, MEMO_ID)).isEqualTo("Original transcript text.");
+	}
+
 	private VoiceMemo completedMemo() {
 		VoiceMemo memo = uploadedMemo();
 		memo.markTranscriptionCompleted();
