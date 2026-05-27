@@ -28,21 +28,22 @@
 
 ## Phase 2: Post-Launch
 
-- Phase 2A selected scope:
+- Define Phase 2 as post-launch work that improves repeated personal use before broad integrations.
+- Phase 2A proposed first slice:
   - Audio file upload for recordings captured outside the app.
   - Manual memo title editing so users can name imported and browser-recorded memos.
   - Reuse the existing transcription, transcript, search, timestamp jump, and playback workflows for imported audio.
-
-### Remaining Phase 2 Candidates
-
-- Social login.
-- Safari and broader browser audio format support.
-- Suggested titles after transcription completes.
-- Allowing users to keep, adopt, or edit suggested titles.
-- Tags, folders, or collections for organization.
-- Speaker labels or transcript segmentation improvements.
-- Summaries, key points, and action items.
-- Generated document view for the full recording.
-- Editing generated documentation after transcription/summarization.
-- Export transcripts or notes.
-- Calendar or learning-tool integrations.
+- Phase 2B proposed slice:
+  - Suggested titles after transcription completes.
+  - Allowing users to keep, adopt, or edit suggested titles.
+  - Tags, folders, or collections for organization.
+- Phase 2C proposed slice:
+  - Summaries, key points, and action items.
+  - Generated document view for the full recording.
+  - Editing generated documentation after transcription/summarization.
+  - Export transcripts or notes.
+- Later Phase 2 candidates:
+  - Safari and broader browser audio format support.
+  - Speaker labels or transcript segmentation improvements.
+  - Social login.
+  - Calendar or learning-tool integrations.

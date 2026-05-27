@@ -1,4 +1,4 @@
-# References: Phase 2A Audio Import And Title Management
+# References: Phase 2 Post-Launch
 
 - `agent-os/product/mission.md`
 - `agent-os/product/roadmap.md`
