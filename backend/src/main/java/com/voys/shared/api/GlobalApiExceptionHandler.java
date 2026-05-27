@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.voys.identity.domain.DuplicateEmailException;
 import com.voys.memo.application.StoragePort.StorageException;
+import com.voys.memo.domain.InvalidMemoFolderException;
 import com.voys.memo.domain.InvalidMemoTitleException;
 import com.voys.memo.domain.InvalidRecordingException;
 import com.voys.memo.domain.MemoNotFoundException;
@@ -83,5 +84,11 @@ public class GlobalApiExceptionHandler {
 	ResponseEntity<ApiErrorResponse> invalidMemoTitle(InvalidMemoTitleException exception) {
 		return ResponseEntity.badRequest()
 			.body(new ApiErrorResponse("memo.invalid_title", exception.getMessage()));
+	}
+
+	@ExceptionHandler(InvalidMemoFolderException.class)
+	ResponseEntity<ApiErrorResponse> invalidMemoFolder(InvalidMemoFolderException exception) {
+		return ResponseEntity.badRequest()
+			.body(new ApiErrorResponse("memo.invalid_folder", exception.getMessage()));
 	}
 }

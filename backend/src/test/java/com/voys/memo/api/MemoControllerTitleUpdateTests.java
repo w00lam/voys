@@ -23,15 +23,15 @@ class MemoControllerTitleUpdateTests {
 	@Test
 	void updateMemoTitleUsesAuthenticatedUserAndRequestTitle() {
 		UserPrincipal principal = new UserPrincipal(OWNER_ID, "user@example.com", "Voys User", "hash");
-		MemoLibraryService.UpdateMemoTitleCommand request =
-			new MemoLibraryService.UpdateMemoTitleCommand("Product strategy sync");
-		MemoLibraryService.MemoTitleUpdateResult expected =
-			new MemoLibraryService.MemoTitleUpdateResult(MEMO_ID.toString(), "Product strategy sync");
-		when(memoLibraryService.updateTitle(OWNER_ID, MEMO_ID, request)).thenReturn(expected);
+		MemoLibraryService.UpdateMemoMetadataCommand request =
+			new MemoLibraryService.UpdateMemoMetadataCommand("Product strategy sync", null);
+		MemoLibraryService.MemoMetadataUpdateResult expected =
+			new MemoLibraryService.MemoMetadataUpdateResult(MEMO_ID.toString(), "Product strategy sync", null);
+		when(memoLibraryService.updateMetadata(OWNER_ID, MEMO_ID, request)).thenReturn(expected);
 
-		MemoLibraryService.MemoTitleUpdateResult response = controller.updateMemo(principal, MEMO_ID, request);
+		MemoLibraryService.MemoMetadataUpdateResult response = controller.updateMemo(principal, MEMO_ID, request);
 
 		assertThat(response).isEqualTo(expected);
-		verify(memoLibraryService).updateTitle(OWNER_ID, MEMO_ID, request);
+		verify(memoLibraryService).updateMetadata(OWNER_ID, MEMO_ID, request);
 	}
 }

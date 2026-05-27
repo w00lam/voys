@@ -252,6 +252,60 @@ h1 {
   align-items: end;
 }
 
+.folder-filter-container,
+.folder-edit-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.folder-filter-container {
+  margin-bottom: 16px;
+}
+
+.folder-filter-container label,
+.folder-edit-container label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.folder-filter-container select,
+.folder-edit-container input {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #20242c;
+  font: inherit;
+}
+
+.folder-filter-container select {
+  padding: 6px 10px;
+}
+
+.folder-edit-container {
+  margin-top: 8px;
+}
+
+.folder-edit-container input {
+  min-width: 0;
+  flex: 1;
+  padding: 8px 12px;
+}
+
+.folder-edit-container button {
+  background: #475569;
+}
+
+.badge-folder {
+  display: inline-block;
+  margin-left: 8px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: #cbd5e1;
+  color: #1e293b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .transcript-panel {
   display: grid;
   gap: 12px;
@@ -346,7 +400,9 @@ button.danger {
   .import-controls,
   .library-heading,
   .memo-list button,
-  .title-edit-container {
+  .title-edit-container,
+  .folder-filter-container,
+  .folder-edit-container {
     align-items: stretch;
     grid-template-columns: 1fr;
     flex-direction: column;

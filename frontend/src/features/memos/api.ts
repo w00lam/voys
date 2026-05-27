@@ -3,6 +3,7 @@ import { apiGet, apiGetBlob, apiPost, apiPostForm, apiPatch } from '../../shared
 export type MemoSummary = {
   id: string;
   title: string;
+  folder: string | null;
   recordingStatus: string;
   transcriptionStatus: string;
   createdAt: string;
@@ -43,8 +44,9 @@ export type TranscriptSegment = {
   text: string;
 };
 
-export function listMemos(): Promise<MemoSummary[]> {
-  return apiGet<MemoSummary[]>('/api/memos');
+export function listMemos(folder?: string): Promise<MemoSummary[]> {
+  const url = folder ? `/api/memos?folder=${encodeURIComponent(folder)}` : '/api/memos';
+  return apiGet<MemoSummary[]>(url);
 }
 
 export function getMemo(id: string): Promise<MemoDetail> {
@@ -82,4 +84,8 @@ export function importAudioFile(file: File, durationSeconds?: number): Promise<C
 
 export function updateMemoTitle(id: string, title: string): Promise<{ id: string; title: string }> {
   return apiPatch<{ id: string; title: string }, { title: string }>(`/api/memos/${id}`, { title });
+}
+
+export function updateMemoFolder(id: string, folder: string | null): Promise<{ id: string; title: string; folder: string | null }> {
+  return apiPatch<{ id: string; title: string; folder: string | null }, { folder: string | null }>(`/api/memos/${id}`, { folder });
 }

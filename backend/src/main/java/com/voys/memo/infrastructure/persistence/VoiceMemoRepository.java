@@ -10,5 +10,7 @@ public interface VoiceMemoRepository extends JpaRepository<VoiceMemo, UUID> {
 
 	List<VoiceMemo> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);
 
+	List<VoiceMemo> findByOwnerIdAndFolderOrderByCreatedAtDesc(UUID ownerId, String folder);
+
 	Optional<VoiceMemo> findByIdAndOwnerId(UUID id, UUID ownerId);
 }

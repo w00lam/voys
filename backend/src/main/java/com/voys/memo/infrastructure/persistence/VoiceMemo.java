@@ -61,6 +61,9 @@ public class VoiceMemo {
 	@Column(name = "suggested_title", length = 200)
 	private String suggestedTitle;
 
+	@Column(name = "folder", length = 80)
+	private String folder;
+
 	protected VoiceMemo() {
 	}
 
@@ -151,6 +154,14 @@ public class VoiceMemo {
 
 	public void setSuggestedTitle(String suggestedTitle) {
 		this.suggestedTitle = suggestedTitle;
+	}
+
+	public String getFolder() {
+		return folder;
+	}
+
+	public void setFolder(String folder) {
+		this.folder = folder;
 	}
 
 	public Instant getCreatedAt() {

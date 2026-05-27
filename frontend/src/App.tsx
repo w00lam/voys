@@ -16,6 +16,7 @@ import {
   startTranscription,
   importAudioFile,
   updateMemoTitle,
+  updateMemoFolder,
   type MemoDetail,
   type MemoSummary,
   type TranscriptResponse,
@@ -91,6 +92,10 @@ function App() {
   const [editingTitle, setEditingTitle] = useState('');
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [saveTitleError, setSaveTitleError] = useState<string | null>(null);
+  const [selectedFilterFolder, setSelectedFilterFolder] = useState('');
+  const [editingFolder, setEditingFolder] = useState('');
+  const [isSavingFolder, setIsSavingFolder] = useState(false);
+  const [saveFolderError, setSaveFolderError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isStoppingRef = useRef(false);
 
@@ -365,11 +370,11 @@ function App() {
     }
   }
 
-  async function refreshMemos() {
+  async function refreshMemos(filterFolder = selectedFilterFolder) {
     setMemoState({ status: 'loading' });
 
     try {
-      const memos = await listMemos();
+      const memos = await listMemos(filterFolder || undefined);
       setMemoState({ status: 'ready', memos });
     } catch (error) {
       setMemoState({ status: 'failed', message: getErrorMessage(error) });
@@ -386,6 +391,7 @@ function App() {
     setPlayback({ status: 'loading', memoId });
     setTranscript({ status: 'loading' });
     setSaveTitleError(null);
+    setSaveFolderError(null);
 
     try {
       const [memo, audio, transcriptResult] = await Promise.all([
@@ -396,6 +402,7 @@ function App() {
       setPlayback({ status: 'ready', memo, audioUrl: URL.createObjectURL(audio) });
       setTranscript({ status: 'ready', transcript: transcriptResult });
       setEditingTitle(memo.title);
+      setEditingFolder(memo.folder || '');
     } catch (error) {
       setPlayback({ status: 'failed', message: getErrorMessage(error) });
       setTranscript({ status: 'idle' });
@@ -499,6 +506,41 @@ function App() {
       setIsSavingTitle(false);
     }
   };
+
+  const handleSaveFolder = async () => {
+    if (playback.status !== 'ready') return;
+    setIsSavingFolder(true);
+    setSaveFolderError(null);
+    const memoId = playback.memo.id;
+    try {
+      const updated = await updateMemoFolder(memoId, editingFolder.trim() || null);
+      setPlayback((prev) => {
+        if (prev.status === 'ready' && prev.memo.id === memoId) {
+          return {
+            ...prev,
+            memo: {
+              ...prev.memo,
+              folder: updated.folder,
+            },
+          };
+        }
+        return prev;
+      });
+      setEditingFolder(updated.folder || '');
+      await refreshMemos();
+    } catch (error) {
+      setSaveFolderError(getErrorMessage(error));
+    } finally {
+      setIsSavingFolder(false);
+    }
+  };
+
+  const handleFilterFolderChange = async (folder: string) => {
+    setSelectedFilterFolder(folder);
+    await refreshMemos(folder);
+  };
+
+
 
   return (
     <main className="app-shell">
@@ -642,9 +684,31 @@ function App() {
                     <h2>저장된 메모</h2>
                     <p>계정에 저장된 녹음과 전사 내용을 확인합니다.</p>
                   </div>
-                  <button type="button" onClick={refreshMemos} disabled={memoState.status === 'loading'}>
+                  <button type="button" onClick={() => refreshMemos()} disabled={memoState.status === 'loading'}>
                     {memoState.status === 'loading' ? '불러오는 중...' : '새로고침'}
                   </button>
+                </div>
+
+                <div className="folder-filter-container">
+                  <label htmlFor="folder-filter-select">폴더 필터</label>
+                  <select
+                    id="folder-filter-select"
+                    value={selectedFilterFolder}
+                    onChange={(e) => handleFilterFolderChange(e.target.value)}
+                  >
+                    <option value="">전체</option>
+                    {(() => {
+                      const foldersInList = memoState.status === 'ready'
+                        ? Array.from(new Set(memoState.memos.map(m => m.folder).filter((f): f is string => !!f)))
+                        : [];
+                      if (selectedFilterFolder && !foldersInList.includes(selectedFilterFolder)) {
+                        foldersInList.push(selectedFilterFolder);
+                      }
+                      return foldersInList.map(f => (
+                        <option key={f} value={f}>{f}</option>
+                      ));
+                    })()}
+                  </select>
                 </div>
 
                 {memoState.status === 'ready' && memoState.memos.length === 0 && (
@@ -659,6 +723,7 @@ function App() {
                           <span>{memo.title}</span>
                           <small>
                             {formatStatus(memo.transcriptionStatus)} · {formatBytes(memo.audioSizeBytes)}
+                            {memo.folder && ` · ${memo.folder}`}
                           </small>
                         </button>
                       </li>
@@ -690,10 +755,33 @@ function App() {
                           type="button"
                           onClick={handleSaveTitle}
                           disabled={isSavingTitle || !editingTitle.trim()}
+                          aria-label="save title"
                         >
                           {isSavingTitle ? '저장 중...' : '저장'}
                         </button>
                       </div>
+
+                      <div className="folder-edit-container">
+                        <label htmlFor="memo-folder-input">메모 폴더</label>
+                        <input
+                          id="memo-folder-input"
+                          type="text"
+                          value={editingFolder}
+                          onChange={(e) => setEditingFolder(e.target.value)}
+                        />
+                        {editingFolder !== (playback.memo.folder || '') && (
+                          <button
+                            type="button"
+                            onClick={handleSaveFolder}
+                            disabled={isSavingFolder}
+                            aria-label="save folder"
+                          >
+                            폴더 저장
+                          </button>
+                        )}
+                      </div>
+                      {saveFolderError && <p className="result failure">{saveFolderError}</p>}
+
                       {transcript.status === 'ready' && transcript.transcript.suggestedTitle && (
                         <div className="suggested-title-box">
                           <span className="suggested-title-text">
@@ -710,14 +798,23 @@ function App() {
                         </div>
                       )}
                       {saveTitleError && <p className="result failure">{saveTitleError}</p>}
-                      <strong>{playback.memo.title}</strong>
+                      <strong>
+                        {playback.memo.title}
+                        {playback.memo.folder && (
+                          <span className="badge-folder">
+                            {playback.memo.folder}
+                          </span>
+                        )}
+                      </strong>
                       <span className="muted">
                         {new Date(playback.memo.createdAt).toLocaleString()}
                       </span>
                     </div>
-                    <audio ref={audioRef} controls src={playback.audioUrl}>
-                      <track kind="captions" />
-                    </audio>
+                    {playback.status === 'ready' && playback.audioUrl && (
+                      <audio ref={audioRef} controls src={playback.audioUrl}>
+                        <track kind="captions" />
+                      </audio>
+                    )}
                     <div className="transcript-panel">
                       <div className="library-heading">
                         <div>

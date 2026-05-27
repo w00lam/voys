@@ -244,9 +244,9 @@ describe('App transcription polling', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
 
-    const folderInput = await screen.findByLabelText(/memo folder|folder|폴더/i);
+    const folderInput = await screen.findByLabelText(/memo folder|메모 폴더/i);
     fireEvent.change(folderInput, { target: { value: 'Work' } });
-    fireEvent.click(screen.getByRole('button', { name: /save folder|폴더 저장|저장/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /save folder|폴더 저장|저장/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(`/api/memos/${memoId}`, expect.objectContaining({
@@ -261,7 +261,7 @@ describe('App transcription polling', () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/memos?folder=Work', { credentials: 'include' });
     });
-    expect(await screen.findByText('Work')).toBeInTheDocument();
+    expect((await screen.findAllByText('Work')).length).toBeGreaterThan(0);
   });
 });
 
