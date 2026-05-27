@@ -16,6 +16,7 @@ import com.voys.memo.domain.InvalidMemoFolderException;
 import com.voys.memo.domain.InvalidMemoTitleException;
 import com.voys.memo.domain.InvalidRecordingException;
 import com.voys.memo.domain.MemoNotFoundException;
+import com.voys.notes.domain.GeneratedNoteNotReadyException;
 import com.voys.search.domain.InvalidSearchQueryException;
 import com.voys.transcription.domain.TranscriptionAlreadyRunningException;
 import com.voys.transcription.domain.TranscriptionFailedException;
@@ -90,5 +91,11 @@ public class GlobalApiExceptionHandler {
 	ResponseEntity<ApiErrorResponse> invalidMemoFolder(InvalidMemoFolderException exception) {
 		return ResponseEntity.badRequest()
 			.body(new ApiErrorResponse("memo.invalid_folder", exception.getMessage()));
+	}
+
+	@ExceptionHandler(GeneratedNoteNotReadyException.class)
+	ResponseEntity<ApiErrorResponse> generatedNoteNotReady(GeneratedNoteNotReadyException exception) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+			.body(new ApiErrorResponse("note.not_ready", exception.getMessage()));
 	}
 }

@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { getTranscript, importAudioFile, listMemos, updateMemoFolder, updateMemoTitle } from './api';
+import {
+  generateGeneratedNote,
+  getGeneratedNote,
+  getTranscript,
+  importAudioFile,
+  listMemos,
+  updateMemoFolder,
+  updateMemoTitle,
+} from './api';
 
 describe('memo api', () => {
   afterEach(() => {
@@ -71,6 +79,29 @@ describe('memo api', () => {
 
     expect(transcript.suggestedTitle).toBe('Product strategy sync');
   });
+
+  test('generates memo notes through the generated-note endpoint', async () => {
+    const fetchMock = installFetchMock();
+
+    const note = await generateGeneratedNote('33333333-3333-3333-3333-333333333333');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/memos/33333333-3333-3333-3333-333333333333/generated-note', expect.objectContaining({
+      method: 'POST',
+      credentials: 'include',
+    }));
+    expect(note.summary).toContain('launch strategy');
+    expect(note.keyPoints).toContain('Launch risks');
+    expect(note.actionItems).toContain('Follow up on owners');
+  });
+
+  test('reads memo generated notes', async () => {
+    const fetchMock = installFetchMock();
+
+    const note = await getGeneratedNote('33333333-3333-3333-3333-333333333333');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/memos/33333333-3333-3333-3333-333333333333/generated-note', { credentials: 'include' });
+    expect(note.status).toBe('GENERATED');
+  });
 });
 
 function installFetchMock() {
@@ -127,11 +158,31 @@ function installFetchMock() {
       });
     }
 
+    if ((init?.method ?? 'GET') === 'POST' && path === '/api/memos/33333333-3333-3333-3333-333333333333/generated-note') {
+      return jsonResponse(generatedNote());
+    }
+
+    if ((init?.method ?? 'GET') === 'GET' && path === '/api/memos/33333333-3333-3333-3333-333333333333/generated-note') {
+      return jsonResponse(generatedNote());
+    }
+
     return jsonResponse({ code: 'test.not_found', message: `${init?.method ?? 'GET'} ${path}` }, 404);
   });
 
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
+}
+
+function generatedNote() {
+  return {
+    memoId: '33333333-3333-3333-3333-333333333333',
+    status: 'GENERATED',
+    summary: 'The team reviewed launch strategy.',
+    keyPoints: ['Launch risks'],
+    actionItems: ['Follow up on owners'],
+    failureReason: null,
+    updatedAt: '2026-05-27T15:30:00Z',
+  };
 }
 
 function jsonResponse(body: unknown, status = 200) {
