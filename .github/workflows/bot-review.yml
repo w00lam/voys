@@ -30,6 +30,7 @@ jobs:
             const repo = context.repo.repo;
             const pull_number = context.payload.pull_request.number;
             const head = context.payload.pull_request.head.ref;
+            const marker = `<!-- voys-auto-review:${head} -->`;
 
             const files = await github.paginate(github.rest.pulls.listFiles, {
               owner,
@@ -69,71 +70,42 @@ jobs:
             const findings = [];
             const reviewFocus = [];
             const validationHints = [];
-            const fileNotes = [];
 
             if ((hasBackend || hasFrontend) && !hasAgentSpec) {
-              findings.push('- 구현 파일이 변경되었지만 Agent OS spec 변경이 없습니다. 기존 spec이 이 작업을 포괄하는지 PR 본문에 명시하는 편이 좋습니다.');
+              findings.push('- Application files changed without an Agent OS spec change. Confirm the PR body explains why no spec update is needed.');
             }
-
             if (riskyFiles.length > 0) {
-              findings.push(`- secret이나 토큰이 포함될 수 있는 파일명이 변경되었습니다: ${riskyFiles.map((file) => `\`${file.filename}\``).join(', ')}`);
+              findings.push(`- Files that may contain secrets or credentials changed: ${riskyFiles.map((file) => `\`${file.filename}\``).join(', ')}`);
             }
-
             if (hasWorkflow) {
-              findings.push('- GitHub workflow 파일이 변경되었습니다. `permissions`, trigger 범위, token 사용 범위, 중복 실행 가능성을 우선 확인하세요.');
+              findings.push('- GitHub workflow files changed. Review permissions, triggers, token usage, and duplicate run risk carefully.');
             }
-
             if (largeFiles.length > 0) {
-              findings.push(`- 변경량이 큰 파일이 있습니다. 리뷰를 나누거나 핵심 의도를 PR에 더 적어두면 좋습니다: ${largeFiles.map((file) => `\`${file.filename}\``).join(', ')}`);
+              findings.push(`- Large file changes detected. Consider whether the PR should be split: ${largeFiles.map((file) => `\`${file.filename}\``).join(', ')}`);
             }
 
             if (hasBackend) {
-              reviewFocus.push('- 백엔드: API 계약, validation, 예외 응답, 트랜잭션 경계, 테스트 커버리지를 확인하세요.');
-              validationHints.push('- `backend/gradlew.bat test` 또는 CI Backend 결과');
+              reviewFocus.push('- Backend: API contracts, validation, error responses, transaction boundaries, and test coverage.');
+              validationHints.push('- Backend tests or CI Backend result.');
             }
-
             if (hasFrontend) {
-              reviewFocus.push('- 프론트엔드: API client의 `credentials`, 로딩/에러 상태, 접근성, 모바일 폭 표시를 확인하세요.');
-              validationHints.push('- `npm run build` 또는 CI Frontend 결과');
+              reviewFocus.push('- Frontend: API credentials, loading/error states, accessibility, responsive layout, and build output.');
+              validationHints.push('- Frontend tests/build or CI Frontend result.');
             }
-
             if (hasSecurityChange) {
-              reviewFocus.push('- 인증/보안: session cookie 설정, CSRF/CORS, 로그인 실패 응답, 보호 API 접근을 확인하세요.');
+              reviewFocus.push('- Security/auth: session cookies, CSRF/CORS, protected API access, and failure responses.');
             }
-
             if (hasStorageChange) {
-              reviewFocus.push('- 파일/녹음: 파일 크기 제한, MIME 검증, 저장 경로 탈출 방지, 실패 시 정리 로직을 확인하세요.');
+              reviewFocus.push('- Storage/audio: file size limits, MIME validation, path exposure prevention, and cleanup after failure.');
             }
-
             if (hasDependencyChange) {
-              reviewFocus.push('- 의존성: lockfile 변경, 라이선스/보안 영향, CI 캐시 영향이 의도된 것인지 확인하세요.');
+              reviewFocus.push('- Dependencies: lockfile consistency, license/security impact, and CI cache behavior.');
             }
-
             if (hasDocs && !hasBackend && !hasFrontend) {
-              reviewFocus.push('- 문서: 실제 워크플로와 명령어가 현재 코드 구조와 맞는지 확인하세요.');
+              reviewFocus.push('- Docs: commands, paths, and described workflows should match the current repository.');
             }
-
             if (hasWorkflow) {
-              validationHints.push('- GitHub Actions에서 `Auto PR`, `Bot Review`, `CI`가 의도대로 한 번씩만 도는지 확인');
-            }
-
-            if (files.some((file) => file.filename === '.github/workflows/auto-pr.yml')) {
-              fileNotes.push('- `.github/workflows/auto-pr.yml`: PR 본문을 매 push마다 다시 쓰는 구조입니다. 사람이 PR 본문에 메모를 추가한 뒤 push하면 덮어써질 수 있으니, 수동 메모를 보존할지 정책을 정하는 게 좋습니다.');
-              fileNotes.push('- `.github/workflows/auto-pr.yml`: `compareCommitsWithBasehead` 결과를 기반으로 파일/커밋 요약을 만듭니다. 변경 파일이 30개를 넘거나 커밋이 10개를 넘는 경우 요약이 잘리는 점을 PR에 드러내는지 확인하세요.');
-            }
-
-            if (files.some((file) => file.filename === '.github/workflows/bot-review.yml')) {
-              fileNotes.push('- `.github/workflows/bot-review.yml`: 이전 자동 리뷰를 삭제한 뒤 새 코멘트를 생성합니다. marker가 브랜치명 기준이라 같은 PR에서는 중복 제거가 되지만, marker 형식 변경 시 과거 코멘트가 남을 수 있습니다.');
-              fileNotes.push('- `.github/workflows/bot-review.yml`: 리뷰 내용은 규칙 기반입니다. 실제 코드 품질 판단이 아니라 위험 신호를 알려주는 보조 리뷰라는 점이 PR에 명확히 드러납니다.');
-            }
-
-            if (files.some((file) => file.filename === '.github/workflows/start-work.yml')) {
-              fileNotes.push('- `.github/workflows/start-work.yml`: 이슈 생성 후 브랜치를 만드는 중간에 실패하면 이슈만 남을 수 있습니다. 실패 시 재실행/정리 흐름을 운영자가 이해할 수 있는지 확인하세요.');
-              fileNotes.push('- `.github/workflows/start-work.yml`: `VOYS_REVIEW_TOKEN`이 없거나 권한이 부족하면 실행이 실패합니다. repo secret 권한 요구사항이 문서화되어 있는지 확인하세요.');
-            }
-
-            if (files.some((file) => file.filename === 'agent-os/standards/git/branching.md')) {
-              fileNotes.push('- `agent-os/standards/git/branching.md`: 실제 GitHub Actions 흐름과 문서의 작업 순서가 맞는지 확인하세요. 특히 이슈 우선, draft PR, 수동 merge 원칙이 같은 방향이어야 합니다.');
+              validationHints.push('- Follow-up GitHub Actions run after workflow changes land.');
             }
 
             const changedFiles = files
@@ -141,47 +113,27 @@ jobs:
               .map((file) => `- \`${file.filename}\` (${file.status}, +${file.additions}/-${file.deletions})`)
               .join('\n');
 
-            const conclusion = findings.length > 0
-              ? '머지 전에 아래 확인사항을 보고 의도된 동작인지 확인하는 편이 좋겠습니다.'
-              : '현재 자동 리뷰 기준에서는 큰 차단 이슈는 보이지 않습니다. 그래도 변경 의도와 검증 결과는 사람이 최종 확인해야 합니다.';
-
             const body = [
-              `<!-- voys-auto-review:${head} -->`,
-              `## 리뷰: ${head}`,
+              marker,
+              `## Automated Review Checklist: ${head}`,
               '',
-              '### 리뷰 결론',
+              '### Findings',
               '',
-              conclusion,
+              findings.length > 0 ? findings.join('\n') : '- No blocking issue was detected by the checklist rules.',
               '',
-              '### 발견 사항',
+              '### Review Focus',
               '',
-              findings.length > 0 ? findings.join('\n') : '- 자동 리뷰 기준에서 즉시 막아야 할 항목은 보이지 않습니다.',
+              reviewFocus.length > 0 ? reviewFocus.join('\n') : '- Confirm the diff matches the linked issue and PR summary.',
               '',
-              '### 파일별 코멘트',
+              '### Validation Hints',
               '',
-              fileNotes.length > 0 ? fileNotes.join('\n') : '- 파일명과 변경 범위만으로 특정할 만한 파일별 코멘트는 없습니다.',
+              validationHints.length > 0 ? validationHints.join('\n') : '- Add the smallest useful validation result to the PR body.',
               '',
-              '### 리뷰 포커스',
+              '### Changed Files',
               '',
-              reviewFocus.length > 0 ? reviewFocus.join('\n') : '- 변경 파일 기준으로 특수 리뷰 포커스는 없습니다. PR 본문과 diff의 일치 여부를 확인하세요.',
+              changedFiles || '- No changed files were found.',
               '',
-              '### 검증 제안',
-              '',
-              validationHints.length > 0 ? validationHints.join('\n') : '- PR 성격에 맞는 최소 수동 검증 결과를 PR 본문에 남기세요.',
-              '',
-              '### 컨텍스트',
-              '',
-              `- 백엔드 파일 변경: ${hasBackend ? '예' : '아니오'}`,
-              `- 프론트엔드 파일 변경: ${hasFrontend ? '예' : '아니오'}`,
-              `- Agent OS spec 변경: ${hasAgentSpec ? '예' : '아니오'}`,
-              `- workflow 파일 변경: ${hasWorkflow ? '예' : '아니오'}`,
-              `- 변경 파일 수: ${files.length}`,
-              '',
-              '### 변경 파일',
-              '',
-              changedFiles || '- 변경 파일을 찾지 못했습니다.',
-              '',
-              '> 이 자동 리뷰는 가드레일이며 승인 의미가 아닙니다.',
+              '> This is a checklist-style automated review, not an approval.',
             ].join('\n');
 
             const comments = await github.paginate(github.rest.issues.listComments, {
@@ -192,11 +144,7 @@ jobs:
             });
 
             for (const comment of comments) {
-              const isPreviousAutoReview =
-                comment.body?.includes(`<!-- voys-auto-review:${head} -->`) ||
-                comment.body?.startsWith(`## 리뷰: ${head}`);
-
-              if (isPreviousAutoReview) {
+              if (comment.body?.includes(marker)) {
                 await github.rest.issues.deleteComment({
                   owner,
                   repo,

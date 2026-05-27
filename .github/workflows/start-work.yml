@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       type:
-        description: "작업 유형"
+        description: "Work type"
         required: true
         default: "feature"
         type: choice
@@ -16,15 +16,15 @@ on:
           - refactor
           - test
       title:
-        description: "이슈 제목"
+        description: "Issue title"
         required: true
         type: string
       slug:
-        description: "브랜치 slug, 예: session-auth"
+        description: "Branch slug, for example session-auth"
         required: true
         type: string
       body:
-        description: "이슈 본문"
+        description: "Issue body"
         required: false
         type: string
 
@@ -53,23 +53,23 @@ jobs:
             const bodyInput = inputs.body || '';
 
             const typeLabels = {
-              feature: '기능',
-              fix: '수정',
-              chore: '작업',
-              docs: '문서',
-              refactor: '리팩터링',
-              test: '테스트',
+              feature: 'Feature',
+              fix: 'Fix',
+              chore: 'Chore',
+              docs: 'Docs',
+              refactor: 'Refactor',
+              test: 'Test',
             };
 
             const slug = slugInput
               .trim()
               .toLowerCase()
-              .replace(/[^a-z0-9가-힣._-]+/g, '-')
+              .replace(/[^a-z0-9_-]+/g, '-')
               .replace(/-+/g, '-')
               .replace(/^-|-$/g, '');
 
             if (!slug) {
-              core.setFailed('브랜치 slug가 비어 있습니다.');
+              core.setFailed('Branch slug is empty after normalization.');
               return;
             }
 
@@ -79,30 +79,28 @@ jobs:
               if (error.status !== 404) {
                 throw error;
               }
-
               await github.rest.issues.createLabel({
                 owner,
                 repo,
                 name: type,
                 color: '2f81f7',
-                description: `${typeLabels[type] || '작업'} 작업`,
+                description: `${typeLabels[type] || 'Work'} work`,
               });
             }
 
-            const labels = [type];
             const issueBody = bodyInput?.trim()
               ? bodyInput
               : [
-                  '## 목표',
+                  '## Goal',
                   '',
                   title,
                   '',
-                  '## 체크리스트',
+                  '## Checklist',
                   '',
-                  '- [ ] Agent OS spec 작성',
-                  '- [ ] 구현',
-                  '- [ ] 테스트 또는 수동 검증',
-                  '- [ ] PR 리뷰',
+                  '- [ ] Agent OS spec written or confirmed unnecessary.',
+                  '- [ ] Implementation completed.',
+                  '- [ ] Tests or manual validation completed.',
+                  '- [ ] PR reviewed before merge.',
                 ].join('\n');
 
             const issue = await github.rest.issues.create({
@@ -110,7 +108,7 @@ jobs:
               repo,
               title,
               body: issueBody,
-              labels,
+              labels: [type],
             });
 
             const issueNumber = issue.data.number;
@@ -121,7 +119,7 @@ jobs:
             core.setOutput('issue_body', issueBody);
             core.setOutput('branch_name', branchName);
             core.setOutput('title', title);
-            core.setOutput('type_label', typeLabels[type] || '작업');
+            core.setOutput('type_label', typeLabels[type] || 'Work');
 
       - name: Create branch and update issue
         uses: actions/github-script@v7
@@ -164,24 +162,24 @@ jobs:
               body: [
                 issueBody,
                 '',
-                '## 작업 브랜치',
+                '## Work Branch',
                 '',
                 `- \`${branchName}\``,
                 '',
-                '## 다음 단계',
+                '## Next Steps',
                 '',
-                '1. 로컬에서 `main`을 최신화합니다.',
-                `2. \`${branchName}\` 브랜치로 전환합니다.`,
-                '3. Agent OS spec을 작성하고 구현을 진행합니다.',
-                '4. push하면 자동 PR이 생성됩니다.',
+                '1. Sync local `main`.',
+                `2. Switch to \`${branchName}\`.`,
+                '3. Write or confirm the Agent OS spec, then implement.',
+                '4. Push the branch to open or update the PR.',
               ].join('\n'),
             });
 
             core.summary
-              .addHeading(`${typeLabel} 시작`)
+              .addHeading(`${typeLabel} started`)
               .addList([
-                `이슈: #${issueNumber} ${title}`,
-                `브랜치: ${branchName}`,
-                `이슈 URL: ${issueUrl}`,
+                `Issue: #${issueNumber} ${title}`,
+                `Branch: ${branchName}`,
+                `Issue URL: ${issueUrl}`,
               ])
               .write();
