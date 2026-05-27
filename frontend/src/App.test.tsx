@@ -213,7 +213,8 @@ describe('App transcription polling', () => {
         body: JSON.stringify({ title: 'Product strategy sync' }),
       }));
     });
-    expect(await screen.findByText('Product strategy sync')).toBeInTheDocument();
+    const renamedElements = await screen.findAllByText('Product strategy sync');
+    expect(renamedElements.length).toBeGreaterThan(0);
   });
 });
 

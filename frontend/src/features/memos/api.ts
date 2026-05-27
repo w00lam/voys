@@ -1,4 +1,4 @@
-import { apiGet, apiGetBlob, apiPost } from '../../shared/api/client';
+import { apiGet, apiGetBlob, apiPost, apiPostForm, apiPatch } from '../../shared/api/client';
 
 export type MemoSummary = {
   id: string;
@@ -60,4 +60,25 @@ export function getTranscript(id: string): Promise<TranscriptResponse> {
 
 export function startTranscription(id: string): Promise<TranscriptResponse> {
   return apiPost<TranscriptResponse, undefined>(`/api/memos/${id}/transcription`);
+}
+
+export type CreatedMemo = {
+  id: string;
+  title: string;
+  recordingStatus: string;
+  transcriptionStatus: string;
+  createdAt: string;
+};
+
+export function importAudioFile(file: File, durationSeconds?: number): Promise<CreatedMemo> {
+  const body = new FormData();
+  body.append('audio', file);
+  if (durationSeconds !== undefined) {
+    body.append('durationSeconds', String(durationSeconds));
+  }
+  return apiPostForm<CreatedMemo>('/api/memos/audio-files', body);
+}
+
+export function updateMemoTitle(id: string, title: string): Promise<{ id: string; title: string }> {
+  return apiPatch<{ id: string; title: string }, { title: string }>(`/api/memos/${id}`, { title });
 }

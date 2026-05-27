@@ -78,6 +78,33 @@ export async function apiPostForm<TResponse>(path: string, body: FormData): Prom
   return response.json() as Promise<TResponse>;
 }
 
+export async function apiPatch<TResponse, TBody extends object | undefined = object>(
+  path: string,
+  body?: TBody,
+): Promise<TResponse> {
+  await ensureCsrfToken();
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      [csrfHeaderName]: csrfToken ?? '',
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+
+  if (response.status === 204) {
+    return undefined as TResponse;
+  }
+
+  return response.json() as Promise<TResponse>;
+}
+
 export function getErrorMessage(error: unknown): string {
   if (isApiError(error)) {
     return error.message;

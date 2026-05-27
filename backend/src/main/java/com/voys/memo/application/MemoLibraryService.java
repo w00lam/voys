@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.voys.memo.domain.InvalidMemoTitleException;
 import com.voys.memo.domain.MemoNotFoundException;
 import com.voys.memo.infrastructure.persistence.AudioAsset;
 import com.voys.memo.infrastructure.persistence.AudioAssetRepository;
@@ -50,6 +51,24 @@ public class MemoLibraryService {
 		AudioAsset audio = findAudio(memoId);
 		StoragePort.StoredResource stored = storagePort.get(audio.getStorageKey());
 		return new AudioDownload(stored.resource(), audio.getContentType(), stored.contentLength());
+	}
+
+	@Transactional
+	public MemoTitleUpdateResult updateTitle(UUID ownerId, UUID memoId, UpdateMemoTitleCommand command) {
+		String title = command.title();
+		if (title == null || title.trim().isEmpty()) {
+			throw new InvalidMemoTitleException("Title cannot be blank.");
+		}
+		title = title.trim();
+		if (title.length() > 200) {
+			throw new InvalidMemoTitleException("Title cannot exceed 200 characters.");
+		}
+
+		VoiceMemo memo = findOwnedMemo(ownerId, memoId);
+		memo.setTitle(title);
+		voiceMemoRepository.save(memo);
+
+		return new MemoTitleUpdateResult(memo.getId() != null ? memo.getId().toString() : null, memo.getTitle());
 	}
 
 	private MemoSummary toSummary(VoiceMemo memo) {
@@ -133,4 +152,8 @@ public class MemoLibraryService {
 		long contentLength
 	) {
 	}
+
+	public record UpdateMemoTitleCommand(String title) {}
+
+	public record MemoTitleUpdateResult(String id, String title) {}
 }

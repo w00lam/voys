@@ -86,4 +86,29 @@ class AudioFileImportServiceTests {
 
 		verifyNoInteractions(userAccountRepository, voiceMemoRepository, audioAssetRepository, storagePort);
 	}
+
+	@Test
+	void importAudioFallsBackToTemporaryTitleWhenFilenameIsMissing() {
+		UserAccount owner = UserAccount.create("user@example.com", "Voys User", "hash");
+		when(userAccountRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+		when(titleGenerator.generate()).thenReturn("Recording 2026-05-27 12:00");
+		when(voiceMemoRepository.save(any(VoiceMemo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		when(storagePort.store(any(StoragePort.StoreObjectRequest.class)))
+			.thenReturn(new StoragePort.StoredObject("memos/imported-audio"));
+
+		AudioFileImportService.ImportedAudioResult result = service.importAudio(new AudioFileImportService.ImportAudioCommand(
+			OWNER_ID,
+			null,
+			"audio/mpeg",
+			4096,
+			null,
+			new ByteArrayInputStream("audio".getBytes())
+		));
+
+		assertThat(result.title()).isEqualTo("Recording 2026-05-27 12:00");
+
+		ArgumentCaptor<AudioAsset> audioCaptor = ArgumentCaptor.forClass(AudioAsset.class);
+		verify(audioAssetRepository).save(audioCaptor.capture());
+		assertThat(audioCaptor.getValue().getOriginalFilename()).isNull();
+	}
 }
