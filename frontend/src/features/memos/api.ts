@@ -89,3 +89,21 @@ export function updateMemoTitle(id: string, title: string): Promise<{ id: string
 export function updateMemoFolder(id: string, folder: string | null): Promise<{ id: string; title: string; folder: string | null }> {
   return apiPatch<{ id: string; title: string; folder: string | null }, { folder: string | null }>(`/api/memos/${id}`, { folder });
 }
+
+export type GeneratedNoteResponse = {
+  memoId: string;
+  status: string;
+  summary: string | null;
+  keyPoints: string[];
+  actionItems: string[];
+  failureReason: string | null;
+  updatedAt: string | null;
+};
+
+export function generateGeneratedNote(memoId: string): Promise<GeneratedNoteResponse> {
+  return apiPost<GeneratedNoteResponse, undefined>(`/api/memos/${memoId}/generated-note`);
+}
+
+export function getGeneratedNote(memoId: string): Promise<GeneratedNoteResponse> {
+  return apiGet<GeneratedNoteResponse>(`/api/memos/${memoId}/generated-note`);
+}

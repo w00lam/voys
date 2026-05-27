@@ -20,6 +20,9 @@ import {
   type MemoDetail,
   type MemoSummary,
   type TranscriptResponse,
+  generateGeneratedNote,
+  getGeneratedNote,
+  type GeneratedNoteResponse,
 } from './features/memos/api';
 import { uploadRecording, type CreatedMemo } from './features/recorder/api';
 import { getErrorMessage } from './shared/api/client';
@@ -67,6 +70,12 @@ type SearchState =
   | { status: 'ready'; results: SearchResult[] }
   | { status: 'failed'; message: string };
 
+type GeneratedNoteState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; note: GeneratedNoteResponse }
+  | { status: 'failed'; message: string };
+
 const MAX_RECORDING_DURATION_SECONDS = 7_200;
 const RECORDING_TIMER_INTERVAL_MS = 1_000;
 
@@ -83,6 +92,7 @@ function App() {
   const [memoState, setMemoState] = useState<MemoState>({ status: 'idle' });
   const [playback, setPlayback] = useState<PlaybackState>({ status: 'idle' });
   const [transcript, setTranscript] = useState<TranscriptState>({ status: 'idle' });
+  const [generatedNote, setGeneratedNote] = useState<GeneratedNoteState>({ status: 'idle' });
   const [searchQuery, setSearchQuery] = useState('');
   const [search, setSearch] = useState<SearchState>({ status: 'idle' });
   const [pendingSeek, setPendingSeek] = useState<number | null>(null);
@@ -126,6 +136,7 @@ function App() {
       setMemoState({ status: 'idle' });
       setPlayback({ status: 'idle' });
       setTranscript({ status: 'idle' });
+      setGeneratedNote({ status: 'idle' });
       setSearchQuery('');
       setSearch({ status: 'idle' });
     }
@@ -390,22 +401,26 @@ function App() {
 
     setPlayback({ status: 'loading', memoId });
     setTranscript({ status: 'loading' });
+    setGeneratedNote({ status: 'loading' });
     setSaveTitleError(null);
     setSaveFolderError(null);
 
     try {
-      const [memo, audio, transcriptResult] = await Promise.all([
+      const [memo, audio, transcriptResult, noteResult] = await Promise.all([
         getMemo(memoId),
         getMemoAudio(memoId),
         getTranscript(memoId),
+        getGeneratedNote(memoId),
       ]);
       setPlayback({ status: 'ready', memo, audioUrl: URL.createObjectURL(audio) });
       setTranscript({ status: 'ready', transcript: transcriptResult });
+      setGeneratedNote({ status: 'ready', note: noteResult });
       setEditingTitle(memo.title);
       setEditingFolder(memo.folder || '');
     } catch (error) {
       setPlayback({ status: 'failed', message: getErrorMessage(error) });
       setTranscript({ status: 'idle' });
+      setGeneratedNote({ status: 'idle' });
     }
   }
 
@@ -423,6 +438,21 @@ function App() {
     } catch (error) {
       setTranscript({ status: 'failed', message: getErrorMessage(error) });
       await refreshMemos();
+    }
+  }
+
+  async function handleGenerateNote() {
+    if (playback.status !== 'ready') {
+      return;
+    }
+
+    setGeneratedNote({ status: 'loading' });
+
+    try {
+      const noteResult = await generateGeneratedNote(playback.memo.id);
+      setGeneratedNote({ status: 'ready', note: noteResult });
+    } catch (error) {
+      setGeneratedNote({ status: 'failed', message: getErrorMessage(error) });
     }
   }
 
@@ -882,6 +912,59 @@ function App() {
                         <p className="result failure">{transcript.message}</p>
                       )}
                     </div>
+                    {transcript.status === 'ready' && transcript.transcript.status === 'COMPLETED' && (
+                      <div className="generated-note-panel">
+                        <div className="library-heading">
+                          <div>
+                            <h2>생성 노트</h2>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleGenerateNote}
+                            disabled={generatedNote.status === 'loading'}
+                          >
+                            {generatedNote.status === 'loading' ? '생성 중...' : '노트 생성'}
+                          </button>
+                        </div>
+
+                        {generatedNote.status === 'ready' && generatedNote.note.status === 'GENERATED' && (
+                          <div className="generated-note-content">
+                            {generatedNote.note.summary && (
+                              <div className="note-section">
+                                <h3>요약</h3>
+                                <p>{generatedNote.note.summary}</p>
+                              </div>
+                            )}
+
+                            {generatedNote.note.keyPoints && generatedNote.note.keyPoints.length > 0 && (
+                              <div className="note-section">
+                                <h3>주요 논점</h3>
+                                <ul>
+                                  {generatedNote.note.keyPoints.map((point, index) => (
+                                    <li key={index}>{point}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {generatedNote.note.actionItems && generatedNote.note.actionItems.length > 0 && (
+                              <div className="note-section">
+                                <h3>향후 계획</h3>
+                                <ul>
+                                  {generatedNote.note.actionItems.map((item, index) => (
+                                    <li key={index}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {generatedNote.status === 'failed' && (
+                          <p className="result failure">{generatedNote.message}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
