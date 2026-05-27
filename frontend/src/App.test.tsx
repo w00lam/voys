@@ -282,6 +282,33 @@ describe('App transcription polling', () => {
     expect(screen.getByText('Launch risks')).toBeInTheDocument();
     expect(screen.getByText('Follow up on owners')).toBeInTheDocument();
   });
+
+  test('edits a generated note and exports note and transcript text', async () => {
+    const fetchMock = mockApi({ initialStatus: 'COMPLETED', generatedNoteReady: true });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Lecture about product strategy/i }));
+
+    const summaryInput = await screen.findByLabelText(/note summary|노트 요약|요약/i);
+    fireEvent.change(summaryInput, { target: { value: 'Edited summary' } });
+    fireEvent.click(screen.getByRole('button', { name: /save note|노트 저장|저장/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`/api/memos/${memoId}/generated-note`, expect.objectContaining({
+        method: 'PATCH',
+      }));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /export note|노트 내보내기/i }));
+    fireEvent.click(screen.getByRole('button', { name: /export transcript|전사 내보내기/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(`/api/memos/${memoId}/generated-note/export`, { credentials: 'include' });
+      expect(fetchMock).toHaveBeenCalledWith(`/api/memos/${memoId}/transcript/export`, { credentials: 'include' });
+    });
+  });
 });
 
 function installMediaRecorderMock() {
@@ -322,7 +349,7 @@ function installMediaRecorderMock() {
   return recorder;
 }
 
-function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: string; completedWithSuggestedTitle?: boolean } = {}) {
+function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: string; completedWithSuggestedTitle?: boolean; generatedNoteReady?: boolean } = {}) {
   let transcriptReads = 0;
   let memoStatus = options.initialStatus ?? 'PENDING';
   let selectedTitle = 'Lecture about product strategy';
@@ -335,7 +362,15 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
     actionItems: string[];
     failureReason: null;
     updatedAt: string | null;
-  } = {
+  } = options.generatedNoteReady ? {
+    memoId,
+    status: 'GENERATED',
+    summary: 'The team reviewed launch strategy.',
+    keyPoints: ['Launch risks'],
+    actionItems: ['Follow up on owners'],
+    failureReason: null,
+    updatedAt: '2026-05-27T15:30:00Z',
+  } : {
     memoId,
     status: 'NOT_GENERATED',
     summary: null,
@@ -539,6 +574,24 @@ function mockApi(options: { failTranscriptionStart?: boolean; initialStatus?: st
       return jsonResponse(generatedNote);
     }
 
+    if (method === 'PATCH' && path === `/api/memos/${memoId}/generated-note`) {
+      generatedNote = {
+        ...generatedNote,
+        status: 'GENERATED',
+        ...JSON.parse(String(init?.body)),
+        updatedAt: '2026-05-27T16:00:00Z',
+      };
+      return jsonResponse(generatedNote);
+    }
+
+    if (method === 'GET' && path === `/api/memos/${memoId}/generated-note/export`) {
+      return textResponse('Summary\nEdited summary');
+    }
+
+    if (method === 'GET' && path === `/api/memos/${memoId}/transcript/export`) {
+      return textResponse('Product strategy sync. The team discussed launch risks.');
+    }
+
     if (method === 'GET' && path === '/api/search?q=strategy') {
       selectedTitle = 'Strategy review';
       memoStatus = 'COMPLETED';
@@ -571,6 +624,15 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: {
       'Content-Type': 'application/json',
+    },
+  });
+}
+
+function textResponse(body: string, status = 200) {
+  return new Response(body, {
+    status,
+    headers: {
+      'Content-Type': 'text/plain; charset=UTF-8',
     },
   });
 }
